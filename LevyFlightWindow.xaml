@@ -41,7 +41,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="65*"/>
                 </Grid.ColumnDefinitions>
-                <ListBox Name="lstFiles" ItemsSource="{Binding Path=DisplayJumpItems}" SelectionChanged="lstFiles_SelectionChanged" MouseDoubleClick="lstFiles_MouseDoubleClick">
+                <ListBox Name="lstFiles" ItemsSource="{Binding Path=ViewSource.View}" SelectionChanged="lstFiles_SelectionChanged" MouseDoubleClick="lstFiles_MouseDoubleClick">
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="{x:Type JumpItem}">
                             <StackPanel Orientation="Horizontal">
@@ -53,10 +53,7 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
                 <GridSplitter Grid.Column="1" Width="2" />
-                <TextBlock Grid.Column="2">
-                    TEST
-                    
-                </TextBlock>
+                <TextBlock Grid.Column="2" Text="{Binding Path=DebugString}" />
             </Grid>
         </Border>
         <TextBlock Grid.Row="2" Text="{Binding Path=SelectedItemFullPath}" />

@@ -6,6 +6,7 @@ using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Shell.Settings;
 using Microsoft.VisualStudio.TextManager.Interop;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Globalization;
@@ -196,43 +197,44 @@ namespace LevyFlight
             return list.ToArray();
         }
 
-        public async Task FindFilesAsync(System.Action<string> onDiscoverFile)
+        public IEnumerable<string> EnumerateSolutionFiles(HashSet<string> knownFiles)
         {
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            ThreadHelper.ThrowIfNotOnUIThread();
             DTE IDE = GetActiveIDE();
             //Debug.WriteLine("Active Doc: " + IDE.ActiveDocument.FullName + " " + IDE.ActiveDocument.ProjectItem.Name);
 
-            var knownFiles = new HashSet<string>();
-            System.Action<string> addFile = (filePath) => {
-                if (!knownFiles.Contains(filePath))
-                {
-                    knownFiles.Add(filePath);
-                    onDiscoverFile(filePath);
-                }
-            };
-
             // Current openning files
-            foreach (var filePath in GetActiveFiles())
-            {
-                addFile(filePath);
-            }
+            Project currentProject = null;
 
-            // Files in the same folder of the active document
-            string currentFolder = Path.GetDirectoryName(IDE.ActiveDocument.FullName);
-            foreach (var filePath in Directory.GetFiles(currentFolder))
+            Document activeDocument = IDE.ActiveDocument;
+            if (activeDocument != null)
             {
-                addFile(filePath);
-            }
-
-            // Files in the active project
-            var currentProject = IDE.ActiveDocument.ProjectItem.ContainingProject;
-            foreach (var item in EnumerateProjectItems(currentProject.ProjectItems))
-            {
-                if (item.FileNames[0].Contains(currentProject.FullName))
+                // Files in the same folder of the active document
+                string currentFolder = Path.GetDirectoryName(activeDocument.FullName);
+                foreach (var filePath in Directory.GetFiles(currentFolder))
                 {
-                    continue;
+                    if (!knownFiles.Contains(filePath))
+                    {
+                        knownFiles.Add(filePath);
+                        yield return filePath;
+                    }
                 }
-                addFile(item.FileNames[0]);
+
+                // Files in the active project
+                currentProject = activeDocument.ProjectItem.ContainingProject;
+                foreach (var item in EnumerateProjectItems(currentProject.ProjectItems))
+                {
+                    if (item.FileNames[0].Contains(currentProject.FullName))
+                    {
+                        continue;
+                    }
+                    var filePath = item.FileNames[0];
+                    if (!knownFiles.Contains(filePath))
+                    {
+                        knownFiles.Add(filePath);
+                        yield return filePath;
+                    }
+                }
             }
 
             // All files in Solution
@@ -251,9 +253,13 @@ namespace LevyFlight
                         {
                             continue;
                         }
-                        addFile(item.FileNames[0]);
+                        var filePath = item.FileNames[0];
+                        if (!knownFiles.Contains(filePath))
+                        {
+                            knownFiles.Add(filePath);
+                            yield return filePath;
+                        }
                     }
-                    await Task.Yield();
                 }
             }
         }
