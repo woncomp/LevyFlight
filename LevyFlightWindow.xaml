@@ -53,7 +53,7 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
                 <GridSplitter Grid.Column="1" Width="2" />
-                <TextBlock Grid.Column="2" Text="{Binding Path=DebugString}" />
+                <TextBlock Grid.Column="2" Text="{Binding Path=DebugString}" FontFamily="Cascadia Mono" />
             </Grid>
         </Border>
         <TextBlock Grid.Row="2" Text="{Binding Path=SelectedItemFullPath}" />

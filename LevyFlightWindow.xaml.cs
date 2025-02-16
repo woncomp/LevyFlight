@@ -42,7 +42,15 @@ namespace LevyFlight
 
         public CollectionViewSource ViewSource { get; set; }
 
-        public string DebugString { get; set; }
+        public string DebugString
+        {
+            get { return debugString ?? ""; }
+            set
+            {
+                debugString = value;
+                OnPropertyChanged();
+            }
+        }
 
         public string SelectedItemFullPath
         {
@@ -57,6 +65,7 @@ namespace LevyFlight
         private CMD cmd;
         private DispatcherTimer filterUpdateTimer;
 
+        private string debugString;
         private string selectedItemFullPath;
 
         private Dictionary<Key, System.Func<bool>> windowsKeyBindings = new Dictionary<Key, Func<bool>>();
@@ -120,7 +129,7 @@ namespace LevyFlight
                 foreach (var activeFile in activeFiles)
                 {
                     string currentFolder = System.IO.Path.GetDirectoryName(activeFile);
-                    if(knownFolders.Contains(currentFolder))
+                    if (knownFolders.Contains(currentFolder))
                     {
                         continue;
                     }
@@ -159,26 +168,24 @@ namespace LevyFlight
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
             List<JumpItem> stagingList = new List<JumpItem>();
-            foreach(var filePath in cmd.EnumerateSolutionFiles(knownFiles))
+            foreach (var filePath in cmd.EnumerateSolutionFiles(knownFiles))
             {
                 var jumpItem = new JumpItem(Category.SolutionFile, filePath);
                 stagingList.Add(jumpItem);
-                if(stagingList.Count >= 2000)
+                if (stagingList.Count >= 2000)
                 {
                     using (ViewSource.DeferRefresh())
                     {
-                        foreach(var item in stagingList)
+                        foreach (var item in stagingList)
                         {
                             AllJumpItems.Add(item);
                         }
                         stagingList.Clear();
                         DebugString = $"Files:{AllJumpItems.Count}";
-                        OnPropertyChanged();
-                        Debug.WriteLine("DebugString: " + DebugString);
                     }
                     await Task.Yield();
                 }
-                if(!this.IsVisible)
+                if (!this.IsVisible)
                 {
                     return;
                 }
@@ -217,7 +224,7 @@ namespace LevyFlight
 
             var doc = IDE.Documents.Open(jumpItem.FullPath);
 
-            while(IDE.ActiveDocument.FullName != jumpItem.FullPath)
+            while (IDE.ActiveDocument.FullName != jumpItem.FullPath)
             {
                 Debug.WriteLine("GoToAsync Wait: " + IDE.ActiveDocument.FullName);
                 await Task.Yield();
@@ -284,10 +291,12 @@ namespace LevyFlight
             if (jumpItem == null)
             {
                 SelectedItemFullPath = null;
+                DebugString = null;
             }
             else
             {
                 SelectedItemFullPath = jumpItem.FullPath;
+                DebugString = jumpItem.DebugString;
             }
         }
 
