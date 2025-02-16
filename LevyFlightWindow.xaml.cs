@@ -122,6 +122,18 @@ namespace LevyFlight
                 knownFiles.Add(filePath);
             }
 
+            // Add recent files
+            var recentFiles1 = cmd.GetRecentFiles(10);
+            foreach (var filePath in recentFiles1)
+            {
+                if (!knownFiles.Contains(filePath))
+                {
+                    var jumpItem = new JumpItem(Category.RecentFile, filePath);
+                    AllJumpItems.Add(jumpItem);
+                    knownFiles.Add(filePath);
+                }
+            }
+
             // Add files in the folders of active files
             {
                 var knownFolders = new HashSet<string>();

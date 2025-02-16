@@ -136,10 +136,10 @@ namespace LevyFlight
         SolutionFile,
         ActiveProjectFile, // Files in projects of active files
         CurrentProjectFile, // File in the project of the current file
-        RecentFile,
         FavoriteFile,
         Bookmark,
         ActiveDirectoryFile,
+        RecentFile,
         ActiveFile,
     }
 
