@@ -1,4 +1,5 @@
 ﻿using EnvDTE;
+using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.Settings;
 using Microsoft.VisualStudio.Shell;
@@ -9,11 +10,13 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Documents;
 using Task = System.Threading.Tasks.Task;
 
 namespace LevyFlight
@@ -165,16 +168,16 @@ namespace LevyFlight
         public void SaveBookmarks()
         {
             var strs = Bookmarks.Select(x => x.ToString()).ToArray();
-            System.IO.File.WriteAllLines(BookmarksFile, strs);
+            File.WriteAllLines(BookmarksFile, strs);
         }
 
         private void LoadBookmarks()
         {
             Bookmarks = new List<JumpItem>();
             var filePath = BookmarksFile;
-            if (System.IO.File.Exists(filePath))
+            if (File.Exists(filePath))
             {
-                foreach (var line in System.IO.File.ReadAllLines(filePath))
+                foreach (var line in File.ReadAllLines(filePath))
                 {
                     Bookmarks.Add(JumpItem.MakeBookmark(line));
                 }
@@ -197,23 +200,47 @@ namespace LevyFlight
             return list.ToArray();
         }
 
-        public IEnumerable<string> EnumerateSolutionFiles(HashSet<string> knownFiles)
+        public IEnumerable<(Category, string)> EnumerateSolutionFiles(HashSet<string> knownFiles)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             DTE IDE = GetActiveIDE();
             //Debug.WriteLine("Active Doc: " + IDE.ActiveDocument.FullName + " " + IDE.ActiveDocument.ProjectItem.Name);
 
             // Current openning files
-            Project currentProject = null;
-
-            Document activeDocument = IDE.ActiveDocument;
-            if (activeDocument != null)
+            var allProjects = new HashSet<Project>();
+            foreach (Project _proj in IDE.Solution.Projects)
             {
-                // Files in the active project
-                currentProject = activeDocument.ProjectItem.ContainingProject;
-                foreach (var item in EnumerateProjectItems(currentProject.ProjectItems))
+                foreach (Project project in ExpandProjectRecursive(_proj))
                 {
-                    if (item.FileNames[0].Contains(currentProject.FullName))
+                    allProjects.Add(project);
+                }
+            }
+
+            var currentProject = IDE.ActiveDocument?.ProjectItem?.ContainingProject;
+            var activeProjects = FindActiveProjects(allProjects);
+
+            var sortedProjects = allProjects.Select(p =>
+            {
+                if (p == currentProject)
+                {
+                    return (p, Category.CurrentProjectFile);
+                }
+                else if (activeProjects.Contains(p))
+                {
+                    return (p, Category.ActiveProjectFile);
+                }
+                else
+                {
+                    return (p, Category.SolutionFile);
+                }
+            }).OrderByDescending(x => x.Item2).ToArray();
+
+            // Files in projects of open files
+            foreach (var (project, category) in sortedProjects)
+            {
+                foreach (var item in EnumerateProjectItems(project.ProjectItems))
+                {
+                    if (item.FileNames[0].Contains(project.FullName))
                     {
                         continue;
                     }
@@ -221,36 +248,64 @@ namespace LevyFlight
                     if (!knownFiles.Contains(filePath))
                     {
                         knownFiles.Add(filePath);
-                        yield return filePath;
+                        yield return (category, filePath);
                     }
+                }
+            }
+        }
+
+        private List<Project> FindActiveProjects(HashSet<Project> knownProjects)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            // IDE.Documents => doesn't work
+            // project.Properties.Cast<Property>().FirstOrDefault(p => p.Name == "ProjectGuid") => doesn't work
+            //
+            // Using workaround comparing both project directory and project name
+
+            var projectIdentifiers = new HashSet<string>();
+
+            var rdt = new RunningDocumentTable(package);
+            foreach (var info in rdt)
+            {
+                uint ignoreFlags = (uint)(_VSRDTFLAGS.RDT_ProjSlnDocument | _VSRDTFLAGS.RDT_VirtualDocument);
+                if ((info.Flags & ignoreFlags) != 0)
+                {
+                    continue;
+                }
+
+                info.Hierarchy.GetProperty((uint)VSConstants.VSITEMID.Root, (int)__VSHPROPID.VSHPROPID_ProjectName, out var projectName);
+                info.Hierarchy.GetProperty((uint)VSConstants.VSITEMID.Root, (int)__VSHPROPID.VSHPROPID_ProjectDir, out var projectDir);
+
+                if (projectName != null && projectDir != null)
+                {
+                    var projectIdentifier = projectDir + "\\" + projectName;
+                    projectIdentifiers.Add(projectIdentifier);
+                    //Debug.WriteLine($"RunningDocumentTable {info.Moniker} Proj:{projectIdentifier}");
                 }
             }
 
-            // All files in Solution
-            foreach (Project _proj in IDE.Solution.Projects)
+            var results = new List<Project>();
+            foreach (string projectIdentifier in projectIdentifiers)
             {
-                foreach (Project project in ExpandProjectRecursive(_proj))
+                var dir = Path.GetDirectoryName(projectIdentifier);
+                var name = Path.GetFileName(projectIdentifier);
+                foreach (var project in knownProjects)
                 {
-                    //Debug.WriteLine("Project " + project.FullName + " " + project.Kind);
-                    if (project == currentProject)
+                    var fullname = project.FullName;
+                    if (!File.Exists(fullname))
                     {
-                        continue; // We've already handled the current project
+                        continue;
                     }
-                    foreach (var item in EnumerateProjectItems(project.ProjectItems))
+                    //Debug.WriteLine($"Check Project: {Path.GetDirectoryName(fullname)} {project.Name} # {dir} {name}");
+                    if (Path.GetDirectoryName(fullname) == dir && project.Name == name)
                     {
-                        if (item.FileNames[0].Contains(project.FullName))
-                        {
-                            continue;
-                        }
-                        var filePath = item.FileNames[0];
-                        if (!knownFiles.Contains(filePath))
-                        {
-                            knownFiles.Add(filePath);
-                            yield return filePath;
-                        }
+                        results.Add(project);
+                        //Debug.WriteLine($"Found Project: {project.FullName} {project.Name}");
                     }
                 }
             }
+            return results;
         }
 
         private static IEnumerable<Project> ExpandProjectRecursive(Project project)
@@ -280,9 +335,9 @@ namespace LevyFlight
 
         private IEnumerable<ProjectItem> EnumerateProjectItems(ProjectItems items)
         {
-            const string ProjectFileGuid = "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
-            const string ProjectFolderGuid = "{6BB5F8EF-4483-11D3-8BCF-00C04F8EC28C}";
-            const string ProjectVirtualFolderGuid = "{6BB5F8F0-4483-11D3-8BCF-00C04F8EC28C}";
+            const string ProjectFileGuid = VSConstants.ItemTypeGuid.PhysicalFile_string;
+            const string ProjectFolderGuid = VSConstants.ItemTypeGuid.PhysicalFolder_string;
+            const string ProjectVirtualFolderGuid = VSConstants.ItemTypeGuid.VirtualFolder_string;
 
             if (items == null)
             {

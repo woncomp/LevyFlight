@@ -168,9 +168,9 @@ namespace LevyFlight
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
             List<JumpItem> stagingList = new List<JumpItem>();
-            foreach (var filePath in cmd.EnumerateSolutionFiles(knownFiles))
+            foreach (var (category, filePath) in cmd.EnumerateSolutionFiles(knownFiles))
             {
-                var jumpItem = new JumpItem(Category.SolutionFile, filePath);
+                var jumpItem = new JumpItem(category, filePath);
                 stagingList.Add(jumpItem);
                 if (stagingList.Count >= 2000)
                 {

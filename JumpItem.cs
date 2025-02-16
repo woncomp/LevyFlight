@@ -134,6 +134,8 @@ namespace LevyFlight
     public enum Category
     {
         SolutionFile,
+        ActiveProjectFile, // Files in projects of active files
+        CurrentProjectFile, // File in the project of the current file
         RecentFile,
         FavoriteFile,
         Bookmark,
