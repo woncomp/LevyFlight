@@ -9,6 +9,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Configuration;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -56,7 +57,6 @@ namespace LevyFlight
         private CMD cmd;
         private DispatcherTimer filterUpdateTimer;
 
-        private Filter filter = new Filter();
         private string selectedItemFullPath;
 
         private Dictionary<Key, System.Func<bool>> windowsKeyBindings = new Dictionary<Key, Func<bool>>();
@@ -100,6 +100,60 @@ namespace LevyFlight
             windowsKeyBindings[Key.K] = () => { MoveSelection(lstFiles.SelectedIndex - 1); return true; };
         }
 
+        private void StartDiscoverFiles()
+        {
+            var knownFiles = new HashSet<string>();
+
+            // Add active files
+            var activeFiles = cmd.GetActiveFiles();
+            foreach (var filePath in activeFiles)
+            {
+                var jumpItem = new JumpItem(Category.ActiveFile, filePath);
+                AllJumpItems.Add(jumpItem);
+                knownFiles.Add(filePath);
+            }
+
+            // Add files in the folders of active files
+            {
+                var knownFolders = new HashSet<string>();
+
+                foreach (var activeFile in activeFiles)
+                {
+                    string currentFolder = System.IO.Path.GetDirectoryName(activeFile);
+                    if(knownFolders.Contains(currentFolder))
+                    {
+                        continue;
+                    }
+                    knownFolders.Add(currentFolder);
+                    foreach (var filePath in Directory.GetFiles(currentFolder))
+                    {
+                        if (!knownFiles.Contains(filePath))
+                        {
+                            var jumpItem = new JumpItem(Category.ActiveDirectoryFile, filePath);
+                            AllJumpItems.Add(jumpItem);
+                            knownFiles.Add(filePath);
+                        }
+                    }
+                }
+            }
+
+            // Add bookmarks
+            foreach (var jumpItem in cmd.Bookmarks)
+            {
+                AllJumpItems.Add(jumpItem);
+            }
+
+            // Start scaning the entire solution a little later
+            DispatcherTimer timer = new DispatcherTimer();
+            timer.Interval = TimeSpan.FromSeconds(0.1);
+            timer.Tick += (_, e2) =>
+            {
+                timer.Stop();
+                _ = StartDiscoverFilesAsync(knownFiles);
+            };
+            timer.Start();
+        }
+
         private async Task StartDiscoverFilesAsync(HashSet<string> knownFiles)
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -107,9 +161,7 @@ namespace LevyFlight
             List<JumpItem> stagingList = new List<JumpItem>();
             foreach(var filePath in cmd.EnumerateSolutionFiles(knownFiles))
             {
-                string fileName = System.IO.Path.GetFileName(filePath);
-                var jumpItem = new JumpItem(fileName, filePath);
-                jumpItem.UpdateScore(filter);
+                var jumpItem = new JumpItem(Category.SolutionFile, filePath);
                 stagingList.Add(jumpItem);
                 if(stagingList.Count >= 2000)
                 {
@@ -241,7 +293,7 @@ namespace LevyFlight
 
         private void txtFilter_TextChanged(object sender, TextChangedEventArgs e)
         {
-            filter.UpdateFilterString((sender as TextBox).Text);
+            Filter.Instance.UpdateFilterString((sender as TextBox).Text);
 
             filterUpdateTimer.Stop();
             filterUpdateTimer.Start();
@@ -252,7 +304,7 @@ namespace LevyFlight
             filterUpdateTimer.Stop();
             foreach (var jumpItem in AllJumpItems)
             {
-                jumpItem.UpdateScore(filter);
+                jumpItem.UpdateScore();
             }
             ViewSource.View.Refresh();
         }
@@ -308,30 +360,7 @@ namespace LevyFlight
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             txtFilter.Focus();
-
-            var knownFiles = new HashSet<string>();
-            var activeFiles = cmd.GetActiveFiles();
-            foreach(var filePath in activeFiles)
-            {
-                string fileName = System.IO.Path.GetFileName(filePath);
-                var jumpItem = new JumpItem(fileName, filePath);
-                AllJumpItems.Add(jumpItem);
-                knownFiles.Add(filePath);
-            }
-            foreach (var jumpItem in cmd.Bookmarks)
-            {
-                AllJumpItems.Add(jumpItem);
-            }
-
-            // Start scaning the entire solution a little later
-            DispatcherTimer timer = new DispatcherTimer();
-            timer.Interval = TimeSpan.FromSeconds(0.1);
-            timer.Tick += (_, e2) =>
-            {
-                timer.Stop();
-                _ = StartDiscoverFilesAsync(knownFiles);
-            };
-            timer.Start();
+            StartDiscoverFiles();
         }
 
         private void Window_SourceInitialized(object sender, EventArgs e)
@@ -343,6 +372,7 @@ namespace LevyFlight
         private void Window_Closing(object sender, CancelEventArgs e)
         {
             SaveWindowSettings();
+            Filter.Instance.Reset();
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
