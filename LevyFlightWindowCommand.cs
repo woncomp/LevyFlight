@@ -154,7 +154,7 @@ namespace LevyFlight
                 text = string.Format("{0} (Line:{1})", doc.Name, lineNo);
             }
 
-            var jumpItem = new JumpItem(text, filePath);
+            var jumpItem = new JumpItem(Category.Bookmark, filePath);
             jumpItem.SetPosition(lineNo, col);
             Bookmarks.Add(jumpItem);
             SaveBookmarks();
@@ -176,7 +176,7 @@ namespace LevyFlight
             {
                 foreach (var line in System.IO.File.ReadAllLines(filePath))
                 {
-                    Bookmarks.Add(JumpItem.ParseBookmark(line));
+                    Bookmarks.Add(JumpItem.MakeBookmark(line));
                 }
             }
         }
@@ -209,17 +209,6 @@ namespace LevyFlight
             Document activeDocument = IDE.ActiveDocument;
             if (activeDocument != null)
             {
-                // Files in the same folder of the active document
-                string currentFolder = Path.GetDirectoryName(activeDocument.FullName);
-                foreach (var filePath in Directory.GetFiles(currentFolder))
-                {
-                    if (!knownFiles.Contains(filePath))
-                    {
-                        knownFiles.Add(filePath);
-                        yield return filePath;
-                    }
-                }
-
                 // Files in the active project
                 currentProject = activeDocument.ProjectItem.ContainingProject;
                 foreach (var item in EnumerateProjectItems(currentProject.ProjectItems))
