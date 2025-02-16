@@ -101,6 +101,7 @@ namespace LevyFlight
         internal IVsTextManager TextManager { get; set; }
 
         internal IComponentModel ComponentModel { get; set; }
+        internal IVsMRUItemsStore MRUItemsStore { get; private set; }
 
         private string BookmarksFile
         {
@@ -126,6 +127,7 @@ namespace LevyFlight
 
             Instance.TextManager = await package.GetServiceAsync(typeof(SVsTextManager)) as IVsTextManager;
             Instance.ComponentModel = await package.GetServiceAsync(typeof(SComponentModel)) as IComponentModel;
+            Instance.MRUItemsStore = await package.GetServiceAsync(typeof(SVsMRUItemsStore)) as IVsMRUItemsStore;
         }
 
         public static DTE GetActiveIDE()
@@ -184,7 +186,6 @@ namespace LevyFlight
             }
         }
 
-        //private List<string> m_AllFiles;
         public string[] GetActiveFiles()
         {
             var list = new List<string>();
@@ -198,6 +199,16 @@ namespace LevyFlight
                 }
             }
             return list.ToArray();
+        }
+
+        public string[] GetRecentFiles(uint count)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            var items = new string[count];
+            MRUItemsStore.GetMRUItems(VSConstants.MruList.SolutionFiles, "", count, items);
+
+            return items.Select(x => x?.Split('|')?.FirstOrDefault()).Where(x => !string.IsNullOrEmpty(x)).ToArray();
         }
 
         public IEnumerable<(Category, string)> EnumerateSolutionFiles(HashSet<string> knownFiles)
