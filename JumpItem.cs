@@ -151,15 +151,19 @@ namespace LevyFlight
 
     public abstract class ScoreComponent
     {
-        public readonly bool USE_DEBUG_INFO = false;
+#if DEBUG
+        public readonly bool USE_DEBUG_INFO = true;
 
         public string DebugInfo;
+#endif
         public uint Score;
         public uint Weight;
 
         public ScoreComponent()
         {
+#if DEBUG
             DebugInfo = "";
+#endif
             Score = 0;
             Weight = 0;
         }
@@ -180,7 +184,9 @@ namespace LevyFlight
             {
                 // Always accept file when the filter is empty
                 Score = 1;
+#if DEBUG
                 DebugInfo = "EmptyFilter";
+#endif
                 return;
             }
             string itemNameI = jumpItem.Name;
@@ -189,12 +195,16 @@ namespace LevyFlight
             if(itemNameNoExt.Length > 0 && itemNameNoExt.Equals(filter.FilterStringRaw, StringComparison.OrdinalIgnoreCase) )
             {
                 Score = 1;
+#if DEBUG
                 DebugInfo = $"FullMatch:{filter.FilterStringRaw}";
+#endif
             }
             else
             {
                 Score = 0;
+#if DEBUG
                 DebugInfo = "FullMatch:<NO>";
+#endif
             }
         }
     }
@@ -207,7 +217,9 @@ namespace LevyFlight
         {
             var filter = Filter.Instance;
             uint numMatchKeywordsCaseSensitive = 0;
+#if DEBUG
             var matchedKeyWords = new List<string>();
+#endif
             {
                 string itemName = jumpItem.Name;
                 foreach (var keyword in filter.FilterStrings)
@@ -215,16 +227,20 @@ namespace LevyFlight
                     if (itemName.Contains(keyword))
                     {
                         numMatchKeywordsCaseSensitive++;
+#if DEBUG
                         if (USE_DEBUG_INFO)
                         {
                             matchedKeyWords.Add(keyword);
                         }
+#endif
                     }
                 }
             }
 
             this.Score = numMatchKeywordsCaseSensitive;
+#if DEBUG
             this.DebugInfo = string.Join(" ", matchedKeyWords.ToArray());
+#endif
         }
     }
 
@@ -236,7 +252,9 @@ namespace LevyFlight
         {
             var filter = Filter.Instance;
             uint numMatchKeywordsCaseInsensitive = 0;
+#if DEBUG
             var matchedKeyWords = new List<string>();
+#endif
             {
                 string itemNameI = jumpItem.Name.ToLower();
                 foreach (var keyword in filter.FilterStringsI)
@@ -244,16 +262,20 @@ namespace LevyFlight
                     if (itemNameI.Contains(keyword))
                     {
                         numMatchKeywordsCaseInsensitive++;
+#if DEBUG
                         if (USE_DEBUG_INFO)
                         {
                             matchedKeyWords.Add(keyword);
                         }
+#endif
                     }
                 }
             }
 
             this.Score = numMatchKeywordsCaseInsensitive;
+#if DEBUG
             this.DebugInfo = string.Join(" ", matchedKeyWords.ToArray());
+#endif
         }
     }
 
@@ -265,7 +287,9 @@ namespace LevyFlight
         {
             var filter = Filter.Instance;
             uint numFullPathMatchKeywordsCaseInsensitive = 0;
+#if DEBUG
             var matchedKeyWords = new List<string>();
+#endif
             {
                 string fullPath = jumpItem.FullPath.ToLower();
                 foreach (var keyword in filter.FilterStringsI)
@@ -273,16 +297,20 @@ namespace LevyFlight
                     if (fullPath.Contains(keyword))
                     {
                         numFullPathMatchKeywordsCaseInsensitive++;
+#if DEBUG
                         if (USE_DEBUG_INFO)
                         {
                             matchedKeyWords.Add(keyword);
                         }
+#endif
                     }
                 }
             }
 
             this.Score = numFullPathMatchKeywordsCaseInsensitive;
+#if DEBUG
             this.DebugInfo = string.Join(" ", matchedKeyWords.ToArray());
+#endif
         }
     }
 
@@ -293,7 +321,9 @@ namespace LevyFlight
         public override void Evaluate(JumpItem jumpItem)
         {
             this.Score = (uint)jumpItem.Category;
+#if DEBUG
             this.DebugInfo = jumpItem.Category.ToString();
+#endif
         }
     }
 }
