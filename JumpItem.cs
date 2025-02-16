@@ -43,6 +43,28 @@ namespace LevyFlight
             }
         }
 
+        public string DebugString
+        {
+            get
+            {
+                var lines = new List<string> { $"{Score,11}  {Name}", "-------------------" }.Concat(ScoreComponents.Select(x =>
+                {
+                    uint s = x.Score;
+                    uint w = x.Weight;
+                    uint o = s * w;
+                    string extraDebugInfo = "";
+#if DEBUG
+                    if (!string.IsNullOrEmpty(x.DebugInfo))
+                    {
+                        extraDebugInfo = "(" + x.DebugInfo + ")";
+                    }
+#endif
+                    return $"{o,11}={w,10}*{s:00} [{x.Name}]{extraDebugInfo}";
+                }));
+                return string.Join("\n", lines);
+            }
+        }
+
         public static JumpItem MakeBookmark(string line)
         {
             var tokens = line.Split('?');
@@ -96,12 +118,12 @@ namespace LevyFlight
         public void UpdateScore()
         {
             uint score = 0;
-            foreach(var c in ScoreComponents)
+            foreach (var c in ScoreComponents)
             {
                 c.Evaluate(this);
                 score += c.Score * c.Weight;
             }
-            if(_scWholeWord.Score == 0 && Filter.Instance.FilterStringsI.Length > _scPathKeywordCI.Score)
+            if (_scWholeWord.Score == 0 && Filter.Instance.FilterStringsI.Length > _scPathKeywordCI.Score)
             {
                 score = 0; // Only accept items that at least match all keywords in the fullpath or get a whole word match
             }
@@ -180,7 +202,7 @@ namespace LevyFlight
         public override void Evaluate(JumpItem jumpItem)
         {
             var filter = Filter.Instance;
-            if(filter.FilterStringsI.Length == 0)
+            if (filter.FilterStringsI.Length == 0)
             {
                 // Always accept file when the filter is empty
                 Score = 1;
@@ -192,7 +214,7 @@ namespace LevyFlight
             string itemNameI = jumpItem.Name;
             string[] itemNameSplit = itemNameI.Split('.');
             string itemNameNoExt = (itemNameSplit != null && itemNameSplit.Length > 0) ? itemNameSplit[0] : itemNameI;
-            if(itemNameNoExt.Length > 0 && itemNameNoExt.Equals(filter.FilterStringRaw, StringComparison.OrdinalIgnoreCase) )
+            if (itemNameNoExt.Length > 0 && itemNameNoExt.Equals(filter.FilterStringRaw, StringComparison.OrdinalIgnoreCase))
             {
                 Score = 1;
 #if DEBUG
@@ -239,7 +261,7 @@ namespace LevyFlight
 
             this.Score = numMatchKeywordsCaseSensitive;
 #if DEBUG
-            this.DebugInfo = string.Join(" ", matchedKeyWords.ToArray());
+            this.DebugInfo = string.Join(",", matchedKeyWords.ToArray());
 #endif
         }
     }
@@ -274,7 +296,7 @@ namespace LevyFlight
 
             this.Score = numMatchKeywordsCaseInsensitive;
 #if DEBUG
-            this.DebugInfo = string.Join(" ", matchedKeyWords.ToArray());
+            this.DebugInfo = string.Join(",", matchedKeyWords.ToArray());
 #endif
         }
     }
@@ -309,7 +331,7 @@ namespace LevyFlight
 
             this.Score = numFullPathMatchKeywordsCaseInsensitive;
 #if DEBUG
-            this.DebugInfo = string.Join(" ", matchedKeyWords.ToArray());
+            this.DebugInfo = string.Join(",", matchedKeyWords.ToArray());
 #endif
         }
     }
