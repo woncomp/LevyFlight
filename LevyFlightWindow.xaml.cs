@@ -113,15 +113,6 @@ namespace LevyFlight
         {
             var knownFiles = new HashSet<string>();
 
-            // Add active files
-            var activeFiles = cmd.GetActiveFiles();
-            foreach (var filePath in activeFiles)
-            {
-                var jumpItem = new JumpItem(Category.ActiveFile, filePath);
-                AllJumpItems.Add(jumpItem);
-                knownFiles.Add(filePath);
-            }
-
             // Add recent files
             var recentFiles1 = cmd.GetRecentFiles(10);
             foreach (var filePath in recentFiles1)
@@ -132,6 +123,15 @@ namespace LevyFlight
                     AllJumpItems.Add(jumpItem);
                     knownFiles.Add(filePath);
                 }
+            }
+
+            // Add active files
+            var activeFiles = cmd.GetActiveFiles();
+            foreach (var filePath in activeFiles)
+            {
+                var jumpItem = new JumpItem(Category.ActiveFile, filePath);
+                AllJumpItems.Add(jumpItem);
+                knownFiles.Add(filePath);
             }
 
             // Add files in the folders of active files
