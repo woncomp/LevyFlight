@@ -186,6 +186,20 @@ namespace LevyFlight
             }
         }
 
+        public string GetActiveFile()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            DTE IDE = GetActiveIDE();
+            if (IDE.ActiveDocument == null)
+            {
+                return null;
+            }
+            else;
+            {
+                return IDE.ActiveDocument.FullName;
+            }
+        }
+
         public string[] GetActiveFiles()
         {
             var list = new List<string>();
