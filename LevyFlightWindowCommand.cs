@@ -194,7 +194,7 @@ namespace LevyFlight
             {
                 return null;
             }
-            else;
+            else
             {
                 return IDE.ActiveDocument.FullName;
             }
