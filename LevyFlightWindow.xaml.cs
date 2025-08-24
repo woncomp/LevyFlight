@@ -111,24 +111,47 @@ namespace LevyFlight
 
         private void StartDiscoverFiles()
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            var currentFile = cmd.GetCurrentFile();
             var knownFiles = new HashSet<string>();
             {// Ignore active file
-                var activeFile = cmd.GetActiveFile();
-                if (activeFile != null)
+                if (!string.IsNullOrEmpty(currentFile))
                 {
-                    knownFiles.Add(activeFile);
+                    knownFiles.Add(currentFile);
                 }
             }
 
             // Add recent files
-            var recentFiles1 = cmd.GetRecentFiles(10);
-            foreach (var filePath in recentFiles1)
+            var recentFiles = TransitionStore.Instance.Recents;
+            var recentEnd = Math.Max(Math.Min(20, recentFiles.Count), recentFiles.Count * 3 / 4);
+            var recentIdx = 0;
+            for (int recentCount = 6; recentCount > 0 && recentIdx < recentEnd; recentIdx++)
             {
+                string filePath = recentFiles[recentIdx];
                 if (!knownFiles.Contains(filePath))
                 {
-                    var jumpItem = new JumpItem(Category.RecentFile, filePath);
+                    var jumpItem = new JumpItem(Category.HotFile, filePath);
                     AllJumpItems.Add(jumpItem);
                     knownFiles.Add(filePath);
+                    recentCount--;
+                }
+            }
+
+            // Add transitions
+            var transitions = TransitionStore.Instance.GetTransitionsForFile(currentFile);
+            int trEnd = Math.Max(Math.Min(20, transitions.Count), transitions.Count * 3 / 4);
+            int trIdx = 0;
+            for (int trCount = 11; trCount > 0 && trIdx < trEnd; trIdx++)
+            {
+                TransitionRecord tr = transitions[trIdx];
+                var filePath = CommonMixin.ToAbsolutePath(tr.Path);
+                if (!knownFiles.Contains(filePath))
+                {
+                    var jumpItem = new JumpItem(Category.Transition, filePath);
+                    AllJumpItems.Add(jumpItem);
+                    knownFiles.Add(filePath);
+                    trCount--;
                 }
             }
 
@@ -138,7 +161,32 @@ namespace LevyFlight
             {
                 if (!knownFiles.Contains(filePath))
                 {
-                    var jumpItem = new JumpItem(Category.ActiveFile, filePath);
+                    var jumpItem = new JumpItem(Category.OpenFile, filePath);
+                    AllJumpItems.Add(jumpItem);
+                    knownFiles.Add(filePath);
+                }
+            }
+
+            // Add more transition files
+            for (; trIdx < trEnd; trIdx++)
+            {
+                TransitionRecord tr = transitions[trIdx];
+                var filePath = CommonMixin.ToAbsolutePath(tr.Path);
+                if (!knownFiles.Contains(filePath))
+                {
+                    var jumpItem = new JumpItem(Category.RecentFile, filePath);
+                    AllJumpItems.Add(jumpItem);
+                    knownFiles.Add(filePath);
+                }
+            }
+
+            // Add more recent files
+            for (; recentIdx < recentEnd; recentIdx++)
+            {
+                string filePath = recentFiles[recentIdx];
+                if (!knownFiles.Contains(filePath))
+                {
+                    var jumpItem = new JumpItem(Category.RecentFile, filePath);
                     AllJumpItems.Add(jumpItem);
                     knownFiles.Add(filePath);
                 }
@@ -158,7 +206,7 @@ namespace LevyFlight
                     knownFolders.Add(currentFolder);
                     foreach (var filePath in Directory.GetFiles(currentFolder))
                     {
-                        if (!knownFiles.Contains(filePath))
+                        if (!knownFiles.Contains(filePath) && !CommonMixin.IsExcluded(filePath))
                         {
                             var jumpItem = new JumpItem(Category.ActiveDirectoryFile, filePath);
                             AllJumpItems.Add(jumpItem);
@@ -390,6 +438,8 @@ namespace LevyFlight
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             txtFilter.Focus();
             StartDiscoverFiles();
         }

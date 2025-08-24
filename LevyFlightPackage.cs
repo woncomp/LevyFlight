@@ -1,4 +1,5 @@
-﻿using Microsoft.VisualStudio.Shell;
+﻿using Microsoft.VisualStudio;
+using Microsoft.VisualStudio.Shell;
 using System;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -24,6 +25,7 @@ namespace LevyFlight
     /// </para>
     /// </remarks>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
+    [ProvideAutoLoad(VSConstants.UICONTEXT.SolutionExists_string, PackageAutoLoadFlags.BackgroundLoad)]
     [Guid(LevyFlightPackage.PackageGuidString)]
     [ProvideMenuResource("Menus.ctmenu", 1)]
     [ProvideToolWindow(typeof(LevyFlightWindow))]
