@@ -101,7 +101,6 @@ namespace LevyFlight
         internal IVsTextManager TextManager { get; set; }
 
         internal IComponentModel ComponentModel { get; set; }
-        internal IVsMRUItemsStore MRUItemsStore { get; private set; }
 
         private string BookmarksFile
         {
@@ -122,12 +121,13 @@ namespace LevyFlight
             SolutionFolder = Path.GetDirectoryName(IDE.Solution.FullName);
             ExtCacheFolder = Path.Combine(SolutionFolder, ".vs", SettingsCollectionName);
 
+            new TransitionStore().Initialize();
+
             OleMenuCommandService commandService = await package.GetServiceAsync(typeof(IMenuCommandService)) as OleMenuCommandService;
             Instance = new LevyFlightWindowCommand(package, commandService);
 
             Instance.TextManager = await package.GetServiceAsync(typeof(SVsTextManager)) as IVsTextManager;
             Instance.ComponentModel = await package.GetServiceAsync(typeof(SComponentModel)) as IComponentModel;
-            Instance.MRUItemsStore = await package.GetServiceAsync(typeof(SVsMRUItemsStore)) as IVsMRUItemsStore;
         }
 
         public static DTE GetActiveIDE()
@@ -186,7 +186,7 @@ namespace LevyFlight
             }
         }
 
-        public string GetActiveFile()
+        public string GetCurrentFile()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             DTE IDE = GetActiveIDE();
@@ -213,16 +213,6 @@ namespace LevyFlight
                 }
             }
             return list.ToArray();
-        }
-
-        public string[] GetRecentFiles(uint count)
-        {
-            ThreadHelper.ThrowIfNotOnUIThread();
-
-            var items = new string[count];
-            MRUItemsStore.GetMRUItems(VSConstants.MruList.SolutionFiles, "", count, items);
-
-            return items.Select(x => x?.Split('|')?.FirstOrDefault()).Where(x => !string.IsNullOrEmpty(x)).ToArray();
         }
 
         public IEnumerable<(Category, string)> EnumerateSolutionFiles(HashSet<string> knownFiles)

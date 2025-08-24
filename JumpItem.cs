@@ -139,8 +139,10 @@ namespace LevyFlight
         FavoriteFile,
         Bookmark,
         ActiveDirectoryFile,
-        ActiveFile,
         RecentFile,
+        OpenFile,
+        Transition,
+        HotFile,
     }
 
     public class Filter
