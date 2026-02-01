@@ -36,6 +36,25 @@ namespace LevyFlight
     /// </summary>
     public partial class LevyFlightWindow : Window, INotifyPropertyChanged
     {
+        public static readonly Key[] QuickOpenKeys = new Key[]
+        {
+            Key.D1,
+            Key.D2,
+            Key.D3,
+            Key.D4,
+            Key.D5,
+            Key.D6,
+            Key.D7,
+            Key.D8,
+            Key.D9,
+            Key.Q,
+            Key.W,
+            Key.E,
+            Key.R,
+            Key.T,
+            Key.Y,
+        };
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         public ObservableCollection<JumpItem> AllJumpItems { get; set; }
@@ -270,6 +289,18 @@ namespace LevyFlight
             }
         }
 
+        private JumpItem GetQuickOpenItemForKey(Key key)
+        {
+            int idx = Array.IndexOf(QuickOpenKeys, key);
+            if (idx < 0) return null;
+            // QuickOpenKeys[0] maps to view item at position 1 (second item)
+            int targetViewIndex = idx + 1;
+            var view = ViewSource.View;
+            if (view == null) return null;
+            if (targetViewIndex >= view.Cast<object>().Count()) return null;
+            return view.Cast<object>().ElementAt(targetViewIndex) as JumpItem;
+        }
+
         private void MoveSelection(int index)
         {
             if (lstFiles.Items.Count > 0)
@@ -433,6 +464,30 @@ namespace LevyFlight
             else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && windowsKeyBindings.ContainsKey(e.Key))
             {
                 e.Handled = windowsKeyBindings[e.Key]();
+            }
+            else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            {
+                var qi = GetQuickOpenItemForKey(e.Key);
+                if (qi != null)
+                {
+                    e.Handled = true;
+                    _ = GoToAsync(qi);
+                }
+            }
+        }
+
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            {
+                // Intercept before controls like TextBox process (e.g., Ctrl+Y = Redo)
+                var qi = GetQuickOpenItemForKey(e.Key);
+                if (qi != null)
+                {
+                    e.Handled = true;
+                    _ = GoToAsync(qi);
+                }
             }
         }
 
