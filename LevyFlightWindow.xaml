@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:LevyFlight"
              mc:Ignorable="d" Title="Levy Flight" ShowInTaskbar="False"
              d:DesignHeight="450" d:DesignWidth="800"
-             KeyDown="Window_KeyDown" Loaded="Window_Loaded" SourceInitialized="Window_SourceInitialized" Closing="Window_Closing">
+             KeyDown="Window_KeyDown" PreviewKeyDown="Window_PreviewKeyDown" Loaded="Window_Loaded" SourceInitialized="Window_SourceInitialized" Closing="Window_Closing">
     <Grid Margin="2">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -41,14 +41,29 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="65*"/>
                 </Grid.ColumnDefinitions>
-                <ListBox Name="lstFiles" ItemsSource="{Binding Path=ViewSource.View}" SelectionChanged="lstFiles_SelectionChanged" MouseDoubleClick="lstFiles_MouseDoubleClick">
+                <ListBox Name="lstFiles" ItemsSource="{Binding Path=ViewSource.View}" SelectionChanged="lstFiles_SelectionChanged" MouseDoubleClick="lstFiles_MouseDoubleClick" AlternationCount="1000">
+                    <ListBox.Resources>
+                        <local:QuickOpenKeyLabelConverter x:Key="QuickOpenKeyLabelConverter" />
+                        <local:AlternationIndexToBrushConverter x:Key="AlternationIndexToBrushConverter" />
+                    </ListBox.Resources>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Background" Value="{Binding RelativeSource={RelativeSource Self}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource AlternationIndexToBrushConverter}}" />
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Style.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="LightBlue" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="{x:Type JumpItem}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding Score}" />
-                                <Label Width="4" />
-                                <TextBlock Text="{Binding Name}" />
-                            </StackPanel>
+                            <DockPanel LastChildFill="True">
+                                <TextBlock Text="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource QuickOpenKeyLabelConverter}}" Width="16" FontWeight="Bold" TextAlignment="Center"/>
+                                <TextBlock Text="{Binding Score}" Width="50"/>
+                                <TextBlock Text="{Binding DisplayName}" Margin="8,0,0,0" />
+                            </DockPanel>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
