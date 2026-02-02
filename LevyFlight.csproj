@@ -58,6 +58,10 @@
     <Compile Include="LevyFlightPackage.cs" />
     <Compile Include="QuickOpenKeyLabelConverter.cs" />
     <Compile Include="TransitionStore.cs" />
+    <Compile Include="tree-sitter.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="external/tree-sitter/tree-sitter.vcxproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="source.extension.vsixmanifest">
@@ -106,4 +110,10 @@
   <Target Name="AfterBuild">
   </Target>
   -->
+  <ItemGroup>
+    <Content Include="$(OutDir)tree-sitter.dll">
+      <Pack>true</Pack>
+      <PackagePath>tree-sitter.dll</PackagePath>
+    </Content>
+  </ItemGroup>
 </Project>
