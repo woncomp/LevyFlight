@@ -1,4 +1,5 @@
-﻿using EnvDTE;
+﻿#define SHOW_DEBUG_INFO
+
 using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
@@ -34,7 +35,7 @@ namespace LevyFlight
             {
                 if (LineNumber >= 0)
                 {
-                    return string.Format("{}(Line:{})", Name, LineNumber);
+                    return $"{Name}(Line:{LineNumber})";
                 }
                 else
                 {
@@ -53,7 +54,7 @@ namespace LevyFlight
                     uint w = x.Weight;
                     uint o = s * w;
                     string extraDebugInfo = "";
-#if DEBUG
+#if SHOW_DEBUG_INFO
                     if (!string.IsNullOrEmpty(x.DebugInfo))
                     {
                         extraDebugInfo = "(" + x.DebugInfo + ")";
@@ -177,7 +178,7 @@ namespace LevyFlight
 
     public abstract class ScoreComponent
     {
-#if DEBUG
+#if SHOW_DEBUG_INFO
         public readonly bool USE_DEBUG_INFO = true;
 
         public string DebugInfo;
@@ -187,7 +188,7 @@ namespace LevyFlight
 
         public ScoreComponent()
         {
-#if DEBUG
+#if SHOW_DEBUG_INFO
             DebugInfo = "";
 #endif
             Score = 0;
@@ -210,7 +211,7 @@ namespace LevyFlight
             {
                 // Always accept file when the filter is empty
                 Score = 1;
-#if DEBUG
+#if SHOW_DEBUG_INFO
                 DebugInfo = "EmptyFilter";
 #endif
                 return;
@@ -221,14 +222,14 @@ namespace LevyFlight
             if (itemNameNoExt.Length > 0 && itemNameNoExt.Equals(filter.FilterStringRaw, StringComparison.OrdinalIgnoreCase))
             {
                 Score = 1;
-#if DEBUG
+#if SHOW_DEBUG_INFO
                 DebugInfo = $"FullMatch:{filter.FilterStringRaw}";
 #endif
             }
             else
             {
                 Score = 0;
-#if DEBUG
+#if SHOW_DEBUG_INFO
                 DebugInfo = "FullMatch:<NO>";
 #endif
             }
@@ -243,7 +244,7 @@ namespace LevyFlight
         {
             var filter = Filter.Instance;
             uint numMatchKeywordsCaseSensitive = 0;
-#if DEBUG
+#if SHOW_DEBUG_INFO
             var matchedKeyWords = new List<string>();
 #endif
             {
@@ -253,7 +254,7 @@ namespace LevyFlight
                     if (itemName.Contains(keyword))
                     {
                         numMatchKeywordsCaseSensitive++;
-#if DEBUG
+#if SHOW_DEBUG_INFO
                         if (USE_DEBUG_INFO)
                         {
                             matchedKeyWords.Add(keyword);
@@ -264,7 +265,7 @@ namespace LevyFlight
             }
 
             this.Score = numMatchKeywordsCaseSensitive;
-#if DEBUG
+#if SHOW_DEBUG_INFO
             this.DebugInfo = string.Join(",", matchedKeyWords.ToArray());
 #endif
         }
@@ -278,7 +279,7 @@ namespace LevyFlight
         {
             var filter = Filter.Instance;
             uint numMatchKeywordsCaseInsensitive = 0;
-#if DEBUG
+#if SHOW_DEBUG_INFO
             var matchedKeyWords = new List<string>();
 #endif
             {
@@ -288,7 +289,7 @@ namespace LevyFlight
                     if (itemNameI.Contains(keyword))
                     {
                         numMatchKeywordsCaseInsensitive++;
-#if DEBUG
+#if SHOW_DEBUG_INFO
                         if (USE_DEBUG_INFO)
                         {
                             matchedKeyWords.Add(keyword);
@@ -299,7 +300,7 @@ namespace LevyFlight
             }
 
             this.Score = numMatchKeywordsCaseInsensitive;
-#if DEBUG
+#if SHOW_DEBUG_INFO
             this.DebugInfo = string.Join(",", matchedKeyWords.ToArray());
 #endif
         }
@@ -313,7 +314,7 @@ namespace LevyFlight
         {
             var filter = Filter.Instance;
             uint numFullPathMatchKeywordsCaseInsensitive = 0;
-#if DEBUG
+#if SHOW_DEBUG_INFO
             var matchedKeyWords = new List<string>();
 #endif
             {
@@ -323,7 +324,7 @@ namespace LevyFlight
                     if (fullPath.Contains(keyword))
                     {
                         numFullPathMatchKeywordsCaseInsensitive++;
-#if DEBUG
+#if SHOW_DEBUG_INFO
                         if (USE_DEBUG_INFO)
                         {
                             matchedKeyWords.Add(keyword);
@@ -334,7 +335,7 @@ namespace LevyFlight
             }
 
             this.Score = numFullPathMatchKeywordsCaseInsensitive;
-#if DEBUG
+#if SHOW_DEBUG_INFO
             this.DebugInfo = string.Join(",", matchedKeyWords.ToArray());
 #endif
         }
@@ -347,7 +348,7 @@ namespace LevyFlight
         public override void Evaluate(JumpItem jumpItem)
         {
             this.Score = (uint)jumpItem.Category;
-#if DEBUG
+#if SHOW_DEBUG_INFO
             this.DebugInfo = jumpItem.Category.ToString();
 #endif
         }
