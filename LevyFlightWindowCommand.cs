@@ -119,7 +119,8 @@ namespace LevyFlight
 
             DTE IDE = Package.GetGlobalService(typeof(DTE)) as DTE;
             SolutionFolder = Path.GetDirectoryName(IDE.Solution.FullName);
-            ExtCacheFolder = Path.Combine(SolutionFolder, ".vs", SettingsCollectionName);
+            ExtCacheFolder = Path.Combine(SolutionFolder, ".vs", Path.GetFileNameWithoutExtension(IDE.Solution.FileName), SettingsCollectionName);
+            Directory.CreateDirectory(ExtCacheFolder);
 
             new TransitionStore().Initialize();
 
