@@ -73,7 +73,7 @@ namespace LevyFlight
 
         public string SelectedItemFullPath
         {
-            get { return selectedItemFullPath ?? "Ctrl+J: Move Down | Ctrl+K: Move Up"; }
+            get { return selectedItemFullPath ?? "Ctrl+J: Move Down | Ctrl+K: Move Up | Ctrl+D: Half Page Down | Ctrl+U: Half Page Up"; }
             set
             {
                 selectedItemFullPath = value;
@@ -126,6 +126,69 @@ namespace LevyFlight
         {
             windowsKeyBindings[Key.J] = () => { MoveSelection(lstFiles.SelectedIndex + 1); return true; };
             windowsKeyBindings[Key.K] = () => { MoveSelection(lstFiles.SelectedIndex - 1); return true; };
+            windowsKeyBindings[Key.D] = () => { FastMove(+1); return true; }; // Ctrl+D half page down
+            windowsKeyBindings[Key.U] = () => { FastMove(-1); return true; }; // Ctrl+U half page up
+        }
+
+        private void FastMove(int direction)
+        {
+            if (lstFiles.Items.Count == 0) return;
+            ScrollViewer sv = FindDescendant<ScrollViewer>(lstFiles);
+            // Compute average item height from visible realized containers
+            double avgItemHeight = 18; // default fallback
+            int firstVisibleIndex = lstFiles.SelectedIndex >= 0 ? lstFiles.SelectedIndex : 0;
+            // Try to refine: search for first realized container above or at selection
+            for (int i = Math.Max(0, firstVisibleIndex - 5); i <= firstVisibleIndex + 5 && i < lstFiles.Items.Count; i++)
+            {
+                if (lstFiles.ItemContainerGenerator.ContainerFromIndex(i) is FrameworkElement fe && fe.ActualHeight > 0)
+                {
+                    avgItemHeight = fe.ActualHeight;
+                    break;
+                }
+            }
+            double visibleItemsApprox = Math.Max(1, Math.Floor(lstFiles.ActualHeight / avgItemHeight));
+            int halfPageItems = (int)Math.Max(1, visibleItemsApprox / 2);
+
+            int current = lstFiles.SelectedIndex;
+            if (current < 0) current = 0;
+            int target = current + direction * halfPageItems;
+            if (target < 0) target = 0;
+            if (target >= lstFiles.Items.Count) target = lstFiles.Items.Count - 1;
+            MoveSelection(target);
+
+            // Align scrolling with target so target appears roughly half-page from previous position
+            if (sv != null)
+            {
+                bool logicalScrolling = sv.CanContentScroll; // if true, VerticalOffset is in items, else pixels
+                if (logicalScrolling)
+                {
+                    double newOffset = sv.VerticalOffset + direction * halfPageItems;
+                    if (newOffset < 0) newOffset = 0;
+                    sv.ScrollToVerticalOffset(newOffset);
+                }
+                else
+                {
+                    double deltaPixels = halfPageItems * avgItemHeight;
+                    double newOffset = sv.VerticalOffset + direction * deltaPixels;
+                    if (newOffset < 0) newOffset = 0;
+                    sv.ScrollToVerticalOffset(newOffset);
+                }
+            }
+        }
+
+        private T FindDescendant<T>(DependencyObject root) where T : DependencyObject
+        {
+            if (root == null) return null;
+            int count = VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(root, i);
+                if (child is T wanted)
+                    return wanted;
+                var result = FindDescendant<T>(child);
+                if (result != null) return result;
+            }
+            return null;
         }
 
         private void StartDiscoverFiles()
@@ -147,7 +210,7 @@ namespace LevyFlight
             var recentIdx = 0;
             for (int recentCount = 6; recentCount > 0 && recentIdx < recentEnd; recentIdx++)
             {
-                string filePath = recentFiles[recentIdx];
+                string filePath = System.IO.Path.GetFullPath(recentFiles[recentIdx]);
                 if (!knownFiles.Contains(filePath))
                 {
                     var jumpItem = new JumpItem(Category.HotFile, filePath);
@@ -218,7 +281,7 @@ namespace LevyFlight
                 foreach (var activeFile in activeFiles)
                 {
                     string currentFolder = System.IO.Path.GetDirectoryName(activeFile);
-                    if (knownFolders.Contains(currentFolder))
+                    if (!Directory.Exists(currentFolder) || knownFolders.Contains(currentFolder))
                     {
                         continue;
                     }
