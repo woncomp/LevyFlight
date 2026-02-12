@@ -68,7 +68,9 @@ namespace LevyFlight
 
         public static JumpItem MakeBookmark(string line)
         {
-            var tokens = line.Split('?');
+            // Support both tab (new) and ? (legacy) delimiters
+            char delimiter = line.Contains('\t') ? '\t' : '?';
+            var tokens = line.Split(delimiter);
             var jumpItem = new JumpItem(Category.Bookmark, tokens[1]);
             jumpItem.Name = tokens[0];
             jumpItem.SetPosition(int.Parse(tokens[2]), int.Parse(tokens[3]));
@@ -113,7 +115,7 @@ namespace LevyFlight
 
         public override string ToString()
         {
-            return string.Format("{0}?{1}?{2}?{3}", Name, FullPath, LineNumber, CaretColumn);
+            return string.Format("{0}\t{1}\t{2}\t{3}", Name, FullPath, LineNumber, CaretColumn);
         }
 
         public void UpdateScore()
