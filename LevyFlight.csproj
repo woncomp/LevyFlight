@@ -59,9 +59,7 @@
     <Compile Include="QuickOpenKeyLabelConverter.cs" />
     <Compile Include="TransitionStore.cs" />
     <Compile Include="tree-sitter.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="external/tree-sitter/tree-sitter.vcxproj" />
+    <Compile Include="TreeSitterCodeParser.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="source.extension.vsixmanifest">
@@ -111,9 +109,10 @@
   </Target>
   -->
   <ItemGroup>
-    <Content Include="$(OutDir)tree-sitter.dll">
-      <Pack>true</Pack>
-      <PackagePath>tree-sitter.dll</PackagePath>
+    <Content Include="libs\treesitter\$(Configuration)\tree-sitter.dll">
+      <Link>tree-sitter.dll</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
 </Project>

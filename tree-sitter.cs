@@ -187,15 +187,19 @@ namespace GitHub.TreeSitter
             }
         }
 
+        public static TSLanguage CppLanguage() { return new TSLanguage(tree_sitter_cpp()); }
+
 #region PInvoke
-        [DllImport("tree-sitter-cpp.dll", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("tree-sitter.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr tree_sitter_cpp();
 
+        /*
         [DllImport("tree-sitter-c-sharp.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr tree_sitter_c_sharp();
 
         [DllImport("tree-sitter-rust.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr tree_sitter_rust();
+        */
 
 
         /**
