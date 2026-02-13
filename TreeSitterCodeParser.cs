@@ -177,7 +177,7 @@ namespace LevyFlight
             }
         }
 
-        private static bool IsSpecialMemberFunction(TSNode funcDefNode, string sourceText, string className)
+        internal static bool IsSpecialMemberFunction(TSNode funcDefNode, string sourceText, string className)
         {
             // Check the declarator field first
             var declarator = funcDefNode.child_by_field_name("declarator");
@@ -311,7 +311,7 @@ namespace LevyFlight
         /// Extracts the return type text from a function_definition node.
         /// Returns empty string for constructors/destructors (no return type).
         /// </summary>
-        private static string GetReturnType(TSNode funcDefNode, string sourceText)
+        internal static string GetReturnType(TSNode funcDefNode, string sourceText)
         {
             var typeNode = funcDefNode.child_by_field_name("type");
             if (!typeNode.is_null())
@@ -323,7 +323,7 @@ namespace LevyFlight
         /// Extracts a comma-separated list of parameter type names from a function_definition.
         /// Drills into the declarator to find the parameter_list.
         /// </summary>
-        private static string GetParameterList(TSNode funcDefNode, string sourceText)
+        internal static string GetParameterList(TSNode funcDefNode, string sourceText)
         {
             // Find the function_declarator (may be wrapped in pointer/reference declarators)
             var declarator = funcDefNode.child_by_field_name("declarator");
@@ -395,7 +395,7 @@ namespace LevyFlight
             return new TSNode(); // null node
         }
 
-        private static string GetFunctionName(TSNode funcDefNode, string sourceText)
+        internal static string GetFunctionName(TSNode funcDefNode, string sourceText)
         {
             // The "declarator" field of a function_definition holds the function declarator
             var declarator = funcDefNode.child_by_field_name("declarator");

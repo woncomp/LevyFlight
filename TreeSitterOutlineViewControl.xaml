@@ -1,0 +1,182 @@
+<UserControl x:Class="LevyFlight.TreeSitterOutlineViewControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:imaging="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.Imaging"
+             xmlns:theming="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Imaging"
+             xmlns:utilities="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Utilities"
+             xmlns:catalog="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.ImageCatalog"
+             xmlns:platformUI="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
+             xmlns:shell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
+             xmlns:local="clr-namespace:LevyFlight"
+             mc:Ignorable="d"
+             d:DesignHeight="400" d:DesignWidth="300"
+             Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"
+             Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}">
+
+    <UserControl.Resources>
+        <utilities:BrushToColorConverter x:Key="BrushToColorConverter"/>
+
+        <!-- Style for toggle buttons in the toolbar -->
+        <Style x:Key="ToolbarToggleButton" TargetType="ToggleButton">
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
+            <Style.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarMouseDownBackgroundGradientBrushKey}}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarSelectedBorderBrushKey}}"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarMouseOverBackgroundGradientBrushKey}}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarBorderBrushKey}}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Style for plain toolbar buttons -->
+        <Style x:Key="ToolbarButton" TargetType="Button">
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarMouseOverBackgroundGradientBrushKey}}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarBorderBrushKey}}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid theming:ImageThemingUtilities.ImageBackgroundColor=
+          "{Binding Background, RelativeSource={RelativeSource AncestorType=UserControl},
+           Converter={StaticResource BrushToColorConverter}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ═══ Row 0: Toolbar ═══ -->
+        <Border Grid.Row="0" BorderBrush="{DynamicResource {x:Static platformUI:EnvironmentColors.ToolWindowBorderBrushKey}}"
+                BorderThickness="0,0,0,1" Padding="4,2">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Filter text box -->
+                <TextBox x:Name="FilterTextBox" Grid.Column="0"
+                         VerticalContentAlignment="Center"
+                         Margin="0,0,4,0" Padding="2,1"
+                         Background="{DynamicResource {x:Static shell:VsBrushes.WindowKey}}"
+                         Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"
+                         Text="" TextChanged="FilterTextBox_TextChanged">
+                </TextBox>
+
+                <!-- Toggle buttons -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Sort alphabetically -->
+                    <ToggleButton x:Name="SortAlphaButton" Style="{StaticResource ToolbarToggleButton}"
+                                  ToolTip="Sort Alphabetically"
+                                  Checked="SortAlphaButton_Changed" Unchecked="SortAlphaButton_Changed">
+                        <imaging:CrispImage Width="16" Height="16"
+                                            Moniker="{x:Static catalog:KnownMonikers.SortAscending}"/>
+                    </ToggleButton>
+
+                    <!-- Follow cursor -->
+                    <ToggleButton x:Name="FollowCursorButton" Style="{StaticResource ToolbarToggleButton}"
+                                  IsChecked="True"
+                                  ToolTip="Follow Cursor"
+                                  Checked="FollowCursorButton_Changed" Unchecked="FollowCursorButton_Changed">
+                        <imaging:CrispImage Width="16" Height="16"
+                                            Moniker="{x:Static catalog:KnownMonikers.Cursor}"/>
+                    </ToggleButton>
+
+                    <!-- Expand all -->
+                    <Button x:Name="ExpandAllButton" Style="{StaticResource ToolbarButton}"
+                            ToolTip="Expand All" Click="ExpandAllButton_Click">
+                        <imaging:CrispImage Width="16" Height="16"
+                                            Moniker="{x:Static catalog:KnownMonikers.ExpandAll}"/>
+                    </Button>
+
+                    <!-- Collapse all -->
+                    <Button x:Name="CollapseAllButton" Style="{StaticResource ToolbarButton}"
+                            ToolTip="Collapse All" Click="CollapseAllButton_Click">
+                        <imaging:CrispImage Width="16" Height="16"
+                                            Moniker="{x:Static catalog:KnownMonikers.CollapseAll}"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ═══ Row 1: TreeView ═══ -->
+        <TreeView x:Name="OutlineTreeView" Grid.Row="1"
+                  BorderThickness="0"
+                  Background="Transparent"
+                  ItemsSource="{Binding}"
+                  SelectedItemChanged="OutlineTreeView_SelectedItemChanged"
+                  PreviewMouseLeftButtonUp="OutlineTreeView_PreviewMouseLeftButtonUp"
+                  VirtualizingStackPanel.IsVirtualizing="True"
+                  VirtualizingStackPanel.VirtualizationMode="Recycling">
+
+            <TreeView.Resources>
+                <!-- Override TreeView selection brushes with VS theme colors -->
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}"
+                                 Color="{DynamicResource {x:Static platformUI:TreeViewColors.SelectedItemActiveColorKey}}"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}"
+                                 Color="{DynamicResource {x:Static platformUI:TreeViewColors.SelectedItemActiveTextColorKey}}"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}"
+                                 Color="{DynamicResource {x:Static platformUI:TreeViewColors.SelectedItemInactiveColorKey}}"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}"
+                                 Color="{DynamicResource {x:Static platformUI:TreeViewColors.SelectedItemInactiveTextColorKey}}"/>
+            </TreeView.Resources>
+
+            <TreeView.ItemContainerStyle>
+                <Style TargetType="TreeViewItem">
+                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                    <Setter Property="Padding" Value="1,1,1,1"/>
+                    <Setter Property="Foreground" Value="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
+                </Style>
+            </TreeView.ItemContainerStyle>
+
+            <TreeView.ItemTemplate>
+                <HierarchicalDataTemplate DataType="{x:Type local:OutlineSymbolItem}"
+                                          ItemsSource="{Binding Children}">
+                    <StackPanel Orientation="Horizontal" Margin="0,1">
+                        <imaging:CrispImage Width="16" Height="16"
+                                            Moniker="{Binding IconMoniker}"
+                                            Margin="0,0,4,0"/>
+                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </HierarchicalDataTemplate>
+            </TreeView.ItemTemplate>
+        </TreeView>
+
+        <!-- ═══ Row 2: "No outline" message (shown when not a C++ file) ═══ -->
+        <TextBlock x:Name="NoOutlineMessage" Grid.Row="1"
+                   Text="No outline available for this file type."
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Foreground="{DynamicResource {x:Static shell:VsBrushes.GrayTextKey}}"
+                   Visibility="Collapsed"/>
+
+        <!-- ═══ Row 2: Status bar ═══ -->
+        <Border Grid.Row="2" BorderBrush="{DynamicResource {x:Static platformUI:EnvironmentColors.ToolWindowBorderBrushKey}}"
+                BorderThickness="0,1,0,0" Padding="4,2">
+            <TextBlock x:Name="StatusText" FontSize="11"
+                       Foreground="{DynamicResource {x:Static shell:VsBrushes.GrayTextKey}}"
+                       TextTrimming="CharacterEllipsis"/>
+        </Border>
+    </Grid>
+</UserControl>

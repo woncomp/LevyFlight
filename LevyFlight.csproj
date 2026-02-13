@@ -54,12 +54,18 @@
       <DependentUpon>LevyFlightWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="LevyFlightWindowCommand.cs" />
+    <Compile Include="OutlineSymbolItem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="LevyFlightPackage.cs" />
     <Compile Include="QuickOpenKeyLabelConverter.cs" />
     <Compile Include="TransitionStore.cs" />
     <Compile Include="tree-sitter.cs" />
     <Compile Include="TreeSitterCodeParser.cs" />
+    <Compile Include="TreeSitterOutlineCollector.cs" />
+    <Compile Include="TreeSitterOutlineView.cs" />
+    <Compile Include="TreeSitterOutlineViewControl.xaml.cs">
+      <DependentUpon>TreeSitterOutlineViewControl.xaml</DependentUpon>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <None Include="source.extension.vsixmanifest">
@@ -95,6 +101,10 @@
   </ItemGroup>
   <ItemGroup>
     <Page Include="LevyFlightWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>XamlIntelliSenseFileGenerator</Generator>
+    </Page>
+    <Page Include="TreeSitterOutlineViewControl.xaml">
       <SubType>Designer</SubType>
       <Generator>XamlIntelliSenseFileGenerator</Generator>
     </Page>

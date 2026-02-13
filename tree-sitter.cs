@@ -377,6 +377,30 @@ namespace GitHub.TreeSitter
             return ptr != IntPtr.Zero ? new TSLanguage(ptr) : null;
         }
         public void edit(TSInputEdit edit) { ts_tree_edit(Ptr, ref edit); }
+
+        /// <summary>
+        /// Compares this (old, edited) tree to <paramref name="newTree"/> and returns
+        /// the ranges whose syntactic structure has changed.
+        /// </summary>
+        public TSRange[] get_changed_ranges(TSTree newTree)
+        {
+            uint length;
+            IntPtr ptr = ts_tree_get_changed_ranges(Ptr, newTree.Ptr, out length);
+            if (ptr == IntPtr.Zero || length == 0)
+                return new TSRange[0];
+
+            var ranges = new TSRange[length];
+            int structSize = Marshal.SizeOf(typeof(TSRange));
+            for (uint i = 0; i < length; i++)
+            {
+                ranges[i] = (TSRange)Marshal.PtrToStructure(
+                    IntPtr.Add(ptr, (int)(i * structSize)), typeof(TSRange));
+            }
+
+            // The C library allocated with malloc — free it
+            ts_tree_changed_ranges_free(ptr);
+            return ranges;
+        }
 #region PInvoke
         /**
         * Create a shallow copy of the syntax tree. This is very fast.
@@ -449,6 +473,11 @@ namespace GitHub.TreeSitter
         */
         [DllImport("tree-sitter.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr ts_tree_get_changed_ranges(IntPtr old_tree, IntPtr new_tree, out uint length);
+
+        // ts_tree_get_changed_ranges returns malloc'd memory.
+        // tree-sitter 0.22+ exposes a free function; fall back to msvcrt free otherwise.
+        [DllImport("tree-sitter.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "free")]
+        private static extern void ts_tree_changed_ranges_free(IntPtr ranges);
 #endregion            
     }
 

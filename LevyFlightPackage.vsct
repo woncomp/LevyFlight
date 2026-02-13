@@ -64,6 +64,13 @@
           <ButtonText>Levy Flight Window</ButtonText>
         </Strings>
       </Button>
+
+      <Button guid="guidLevyFlightPackageCmdSet" id="BirdsEyeViewCommandId" priority="0x0101" type="Button">
+        <Parent guid="guidLevyFlightPackageCmdSet" id="MyMenuGroup" />
+        <Strings>
+          <ButtonText>Bird's Eye View</ButtonText>
+        </Strings>
+      </Button>
       
       <Button guid="guidLevyFlightPackageCmdSet" id="LevyFlightToggleBookmarkCommandId" priority="0x0110" type="Button">
         <Parent guid="guidLevyFlightPackageCmdSet" id="MyMenuGroup" />
@@ -148,6 +155,7 @@
       <IDSymbol name="TopLevelMenu" value="0x1021" />
       <IDSymbol name="MyMenuGroup" value="0x1020" />
       <IDSymbol name="LevyFlightWindowCommandId" value="0x0100" />
+      <IDSymbol name="BirdsEyeViewCommandId" value="0x0120" />
       <IDSymbol name="LevyFlightToggleBookmarkCommandId" value="0x0110" />
       <IDSymbol name="NextBookmarkCommandId" value="0x0111" />
       <IDSymbol name="PreviousBookmarkCommandId" value="0x0112" />

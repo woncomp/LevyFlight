@@ -51,6 +51,7 @@ namespace LevyFlight
         public const int PreviousBookmarkInDocumentCommandId = 0x0115;
         public const int NextBookmarkInFolderCommandId = 0x0116;
         public const int PreviousBookmarkInFolderCommandId = 0x0117;
+        public const int BirdsEyeViewCommandId = 0x0120;
 
         /// <summary>
         /// Event raised when bookmarks are added, removed, or cleared.
@@ -91,6 +92,9 @@ namespace LevyFlight
             commandService.AddCommand(new MenuCommand(PreviousBookmarkInDocumentHandler, new CommandID(CommandSet, PreviousBookmarkInDocumentCommandId)));
             commandService.AddCommand(new MenuCommand(NextBookmarkInFolderHandler, new CommandID(CommandSet, NextBookmarkInFolderCommandId)));
             commandService.AddCommand(new MenuCommand(PreviousBookmarkInFolderHandler, new CommandID(CommandSet, PreviousBookmarkInFolderCommandId)));
+
+            // Register Bird's Eye View command handler
+            commandService.AddCommand(new MenuCommand(BirdsEyeViewHandler, new CommandID(CommandSet, BirdsEyeViewCommandId)));
 
             SettingsManager settingsManager = new ShellSettingsManager(this.package);
             this.SettingsStore = settingsManager.GetWritableSettingsStore(SettingsScope.UserSettings);
@@ -682,6 +686,26 @@ namespace LevyFlight
             //Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(windowFrame.Show());
             var wnd = new LevyFlightWindow(this);
             wnd.ShowDialog();
+        }
+
+        /// <summary>
+        /// Opens the Bird's Eye View (Document Outline) dockable tool window.
+        /// </summary>
+        private void BirdsEyeViewHandler(object sender, EventArgs e)
+        {
+            package.JoinableTaskFactory.RunAsync(async delegate
+            {
+                ToolWindowPane window = await package.ShowToolWindowAsync(
+                    typeof(TreeSitterOutlineView),
+                    id: 0,
+                    create: true,
+                    cancellationToken: package.DisposalToken);
+
+                if (window?.Frame == null)
+                {
+                    Debug.WriteLine("[BirdsEye] Cannot create Bird's Eye View tool window");
+                }
+            });
         }
     }
 }
