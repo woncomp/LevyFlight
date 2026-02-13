@@ -40,10 +40,14 @@ namespace LevyFlight
             }
             geometry.Freeze();
 
-            var drawing = new GeometryDrawing(
-                new SolidColorBrush(Color.FromRgb(100, 180, 255)),  // Light steel blue fill
-                new Pen(new SolidColorBrush(Color.FromRgb(40, 100, 180)), 1.0), // Darker blue stroke
-                geometry);
+            var fillBrush = new SolidColorBrush(Color.FromRgb(80, 200, 120));   // Emerald green fill
+            fillBrush.Freeze();
+            var strokeBrush = new SolidColorBrush(Color.FromRgb(20, 120, 60));  // Darker emerald stroke
+            strokeBrush.Freeze();
+            var pen = new Pen(strokeBrush, 1.0);
+            pen.Freeze();
+
+            var drawing = new GeometryDrawing(fillBrush, pen, geometry);
             drawing.Freeze();
 
             var image = new System.Windows.Media.DrawingImage(drawing);
