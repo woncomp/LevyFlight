@@ -1,4 +1,5 @@
 using GitHub.TreeSitter;
+using Microsoft.VisualStudio.Imaging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -160,8 +161,36 @@ namespace LevyFlight
                 var jumpItem = new JumpItem(Category.TreeSitter, filePath);
                 jumpItem.Name = displayName;
                 jumpItem.SetPosition((int)start.row + 1, (int)start.column);
+                jumpItem.IconMoniker = KnownMonikers.MethodPublic;
                 results.Add(jumpItem);
                 insideFunction = true;
+            }
+
+            // Function declarations (prototypes) — e.g. "void foo(int);" at namespace/class scope
+            if (nodeType == "declaration" && !insideFunction)
+            {
+                var declarator = node.child_by_field_name("declarator");
+                if (!declarator.is_null() && declarator.type() == "function_declarator")
+                {
+                    string returnType = GetReturnType(node, sourceText);
+                    string funcName = ExtractDeclaratorName(declarator, sourceText);
+
+                    if (!funcName.Contains("::") && scopeStack.Count > 0)
+                    {
+                        funcName = string.Join("::", scopeStack) + "::" + funcName;
+                    }
+
+                    string paramList = GetParameterList(node, sourceText);
+                    string displayName = (!string.IsNullOrEmpty(returnType) ? returnType + " " : "") + funcName + "(" + paramList + ")";
+
+                    var start = node.start_point();
+                    var jumpItem = new JumpItem(Category.TreeSitter, filePath);
+                    jumpItem.Name = displayName;
+                    jumpItem.SetPosition((int)start.row + 1, (int)start.column);
+                    jumpItem.IconMoniker = KnownMonikers.Procedure;
+                    jumpItem.IsDeclaration = true;
+                    results.Add(jumpItem);
+                }
             }
 
             recurse:
@@ -422,7 +451,7 @@ namespace LevyFlight
             return "<unknown>";
         }
 
-        private static string ExtractDeclaratorName(TSNode declarator, string sourceText)
+        internal static string ExtractDeclaratorName(TSNode declarator, string sourceText)
         {
             string type = declarator.type();
 

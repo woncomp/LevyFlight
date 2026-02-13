@@ -4,6 +4,10 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:LevyFlight"
+             xmlns:imaging="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.Imaging"
+             xmlns:theming="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Imaging"
+             xmlns:utilities="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Utilities"
+             xmlns:catalog="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.ImageCatalog"
              xmlns:platformUI="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
              xmlns:shell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
              mc:Ignorable="d" Title="Levy Flight" ShowInTaskbar="False"
@@ -55,29 +59,65 @@
                 </Grid.ColumnDefinitions>
                 <ListBox Name="lstFiles" ItemsSource="{Binding Path=ViewSource.View}" SelectionChanged="lstFiles_SelectionChanged" MouseDoubleClick="lstFiles_MouseDoubleClick" AlternationCount="1000"
                          Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
-                         Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}">
+                         Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"
+                         theming:ImageThemingUtilities.ImageBackgroundColor="{Binding Background, RelativeSource={RelativeSource Self}, Converter={StaticResource BrushToColorConverter}}">
                     <ListBox.Resources>
                         <local:QuickOpenKeyLabelConverter x:Key="QuickOpenKeyLabelConverter" />
                         <local:AlternationIndexToBrushConverter x:Key="AlternationIndexToBrushConverter" />
+                        <utilities:BrushToColorConverter x:Key="BrushToColorConverter"/>
                     </ListBox.Resources>
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
-                            <Setter Property="Background" Value="{Binding RelativeSource={RelativeSource Self}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource AlternationIndexToBrushConverter}}" />
                             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            <Style.Triggers>
-                                <Trigger Property="IsSelected" Value="True">
-                                    <Setter Property="Background" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarMouseDownBackgroundGradientBrushKey}}" />
-                                    <Setter Property="Foreground" Value="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}" />
-                                </Trigger>
-                            </Style.Triggers>
+                            <Setter Property="Padding" Value="2,1"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Bd"
+                                                Background="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource AlternationIndexToBrushConverter}}"
+                                                Padding="{TemplateBinding Padding}"
+                                                SnapsToDevicePixels="True">
+                                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <!-- Hover: gray background -->
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#40808080"/>
+                                            </Trigger>
+                                            <!-- Selected: emerald green (overrides hover) -->
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#2E8B57"/>
+                                                <Setter Property="Foreground" Value="White"/>
+                                                <Setter Property="FontWeight" Value="Bold"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
                         </Style>
                     </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
-                        <DataTemplate DataType="{x:Type JumpItem}">
+                        <DataTemplate DataType="{x:Type local:JumpItem}">
                             <DockPanel LastChildFill="True">
-                                <TextBlock Text="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource QuickOpenKeyLabelConverter}}" Width="16" FontWeight="Bold" TextAlignment="Center"/>
-                                <TextBlock Text="{Binding Score}" Width="50"/>
-                                <TextBlock Text="{Binding DisplayName}" Margin="8,0,0,0" />
+                                <!-- Hotkey hint: bound to QuickOpenIndex instead of AlternationIndex -->
+                                <TextBlock Text="{Binding QuickOpenIndex, Converter={StaticResource QuickOpenKeyLabelConverter}}"
+                                           Width="16" FontWeight="Bold" TextAlignment="Center"
+                                           Foreground="{DynamicResource {x:Static shell:VsBrushes.GrayTextKey}}"
+                                           DockPanel.Dock="Left"/>
+                                <!-- Icon -->
+                                <imaging:CrispImage Width="16" Height="16"
+                                                    Moniker="{Binding IconMoniker}"
+                                                    Margin="2,0,4,0"
+                                                    DockPanel.Dock="Left"/>
+                                <!-- Score: docked right -->
+                                <TextBlock Text="{Binding Score}" Width="40" TextAlignment="Right"
+                                           Foreground="{DynamicResource {x:Static shell:VsBrushes.GrayTextKey}}"
+                                           Margin="4,0,4,0"
+                                           DockPanel.Dock="Right"/>
+                                <!-- Display name: fills remaining space -->
+                                <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
                             </DockPanel>
                         </DataTemplate>
                     </ListBox.ItemTemplate>

@@ -320,6 +320,7 @@ namespace LevyFlight
                                 AllJumpItems.Add(item);
                             }
                         }
+                        RefreshQuickOpenIndices();
                     }
                 }, TaskScheduler.Default);
             }
@@ -355,6 +356,7 @@ namespace LevyFlight
                         stagingList.Clear();
                         DebugString = $"Files:{AllJumpItems.Count}";
                     }
+                    RefreshQuickOpenIndices();
                     await Task.Yield();
                 }
                 if (!this.IsVisible)
@@ -370,6 +372,7 @@ namespace LevyFlight
                 }
                 DebugString = $"Files:{AllJumpItems.Count}";
             }
+            RefreshQuickOpenIndices();
         }
 
         private JumpItem GetQuickOpenItemForKey(Key key)
@@ -500,6 +503,39 @@ namespace LevyFlight
                 jumpItem.UpdateScore();
             }
             ViewSource.View.Refresh();
+            RefreshQuickOpenIndices();
+        }
+
+        /// <summary>
+        /// Assigns QuickOpenIndex to the first 16 visible items in the sorted view.
+        /// Index 0 = first item (no hotkey), 1..15 = hotkey labels.
+        /// All other items get -1.
+        /// Must be called after every ViewSource.View.Refresh().
+        /// </summary>
+        private readonly List<JumpItem> _previousQuickOpenItems = new List<JumpItem>();
+        private void RefreshQuickOpenIndices()
+        {
+            // Reset previously assigned items
+            foreach (var item in _previousQuickOpenItems)
+            {
+                item.QuickOpenIndex = -1;
+            }
+            _previousQuickOpenItems.Clear();
+
+            var view = ViewSource?.View;
+            if (view == null) return;
+
+            int idx = 0;
+            foreach (var obj in view)
+            {
+                if (idx >= 16) break;
+                if (obj is JumpItem item)
+                {
+                    item.QuickOpenIndex = idx;
+                    _previousQuickOpenItems.Add(item);
+                    idx++;
+                }
+            }
         }
 
         private void txtFilter_KeyDown(object sender, KeyEventArgs e)

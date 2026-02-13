@@ -1,5 +1,7 @@
 ﻿#define SHOW_DEBUG_INFO
 
+using Microsoft.VisualStudio.Imaging;
+using Microsoft.VisualStudio.Imaging.Interop;
 using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
@@ -25,6 +27,15 @@ namespace LevyFlight
 
         public uint Score { get; set; }
         public ScoreComponent[] ScoreComponents { get; private set; }
+
+        /// <summary>Icon shown in the jump list. Set automatically by category; overridden for TreeSitter items.</summary>
+        public ImageMoniker IconMoniker { get; set; }
+
+        /// <summary>Index used for quick-open hotkey hints. -1 = no hint, 0 = first item (no hotkey), 1..15 = hotkey 1-9,Q,W,E,R,T,Y.</summary>
+        public int QuickOpenIndex { get; set; } = -1;
+
+        /// <summary>True for function prototypes/forward declarations (vs full definitions).</summary>
+        public bool IsDeclaration { get; set; }
 
         private ScoreComponent_WholeWord _scWholeWord;
         private ScoreComponent_PathKeywordCI _scPathKeywordCI;
@@ -87,6 +98,23 @@ namespace LevyFlight
             CaretColumn = -1;
             Score = 1;
 
+            // Auto-assign icon based on category
+            switch (category)
+            {
+                case Category.Bookmark:
+                    IconMoniker = KnownMonikers.Bookmark;
+                    break;
+                case Category.FavoriteFile:
+                    IconMoniker = KnownMonikers.Favorite;
+                    break;
+                case Category.TreeSitter:
+                    IconMoniker = KnownMonikers.MethodPublic; // overridden at creation time
+                    break;
+                default:
+                    IconMoniker = GetFileIconMoniker(fullPath);
+                    break;
+            }
+
             _scWholeWord = new ScoreComponent_WholeWord();
             _scPathKeywordCI = new ScoreComponent_PathKeywordCI();
             _scNameKeywordCI = new ScoreComponent_NameKeywordCI();
@@ -134,6 +162,48 @@ namespace LevyFlight
                 score = 0; // Only accept items that at least match all keywords in the fullpath or get a whole word match
             }
             this.Score = score;
+        }
+
+        /// <summary>
+        /// Maps a file extension to the appropriate VS <see cref="ImageMoniker"/>.
+        /// </summary>
+        public static ImageMoniker GetFileIconMoniker(string filePath)
+        {
+            string ext = System.IO.Path.GetExtension(filePath)?.ToLowerInvariant() ?? "";
+            switch (ext)
+            {
+                case ".cpp":
+                case ".cxx":
+                case ".cc":
+                case ".c":
+                    return KnownMonikers.CPPSourceFile;
+                case ".h":
+                case ".hpp":
+                case ".hxx":
+                case ".hh":
+                case ".inl":
+                case ".ipp":
+                case ".tpp":
+                    return KnownMonikers.CPPHeaderFile;
+                case ".cs":
+                    return KnownMonikers.CSFileNode;
+                case ".xaml":
+                    return KnownMonikers.PhoneXAML;
+                case ".py":
+                    return KnownMonikers.PYFileNode;
+                case ".json":
+                    return KnownMonikers.JSONScript;
+                case ".xml":
+                    return KnownMonikers.XMLFile;
+                case ".js":
+                    return KnownMonikers.JSScript;
+                case ".txt":
+                case ".md":
+                case ".log":
+                    return KnownMonikers.TextFile;
+                default:
+                    return KnownMonikers.Document;
+            }
         }
     }
 
