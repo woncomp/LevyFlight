@@ -304,6 +304,26 @@ namespace LevyFlight
                 AllJumpItems.Add(jumpItem);
             }
 
+            // Kick off tree-sitter C++ parse of the active document
+            if (!string.IsNullOrEmpty(currentFile))
+            {
+                _ = TreeSitterCodeParser.ParseAndListFunctionsAsync(currentFile).ContinueWith(async t =>
+                {
+                    var items = t.Result;
+                    if (items.Count > 0)
+                    {
+                        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                        using (ViewSource.DeferRefresh())
+                        {
+                            foreach (var item in items)
+                            {
+                                AllJumpItems.Add(item);
+                            }
+                        }
+                    }
+                }, TaskScheduler.Default);
+            }
+
             // Start scaning the entire solution a little later
             DispatcherTimer timer = new DispatcherTimer();
             timer.Interval = TimeSpan.FromSeconds(0.1);
