@@ -28,6 +28,7 @@ namespace LevyFlight
 
         private ScoreComponent_WholeWord _scWholeWord;
         private ScoreComponent_PathKeywordCI _scPathKeywordCI;
+        private ScoreComponent_NameKeywordCI _scNameKeywordCI;
 
         public string DisplayName
         {
@@ -88,12 +89,13 @@ namespace LevyFlight
 
             _scWholeWord = new ScoreComponent_WholeWord();
             _scPathKeywordCI = new ScoreComponent_PathKeywordCI();
+            _scNameKeywordCI = new ScoreComponent_NameKeywordCI();
             var scores = new List<(uint, ScoreComponent)> // (ValueSpace, ScoreComponentClass)
             {
                 (10, new ScoreComponent_NameKeywordCS()), // Match keywords on item name, case sensitive
                 (10, _scPathKeywordCI), // Match keywords on item full path, case insensitive
                 (10, new ScoreComponent_Category()), // Sort on category
-                (10, new ScoreComponent_NameKeywordCI()), // Match keywords on item name, case insensitive
+                (10, _scNameKeywordCI), // Match keywords on item name, case insensitive
                 (10, _scWholeWord), // Whole word match. First check if the filename without extension matches, if true try to match more components in the full path
             };
             uint accumWeight = 1;
@@ -126,7 +128,8 @@ namespace LevyFlight
                 c.Evaluate(this);
                 score += c.Score * c.Weight;
             }
-            if (_scWholeWord.Score == 0 && Filter.Instance.FilterStringsI.Length > _scPathKeywordCI.Score)
+            int numKeywords = Filter.Instance.FilterStringsI.Length;
+            if (_scWholeWord.Score == 0 && numKeywords > _scPathKeywordCI.Score && numKeywords > _scNameKeywordCI.Score)
             {
                 score = 0; // Only accept items that at least match all keywords in the fullpath or get a whole word match
             }
@@ -142,6 +145,7 @@ namespace LevyFlight
         FavoriteFile,
         Bookmark,
         ActiveDirectoryFile,
+        TreeSitter,
         RecentFile,
         OpenFile,
         Transition,

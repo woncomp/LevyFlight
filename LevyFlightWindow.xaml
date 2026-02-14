@@ -4,8 +4,12 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:LevyFlight"
+             xmlns:platformUI="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
+             xmlns:shell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
              mc:Ignorable="d" Title="Levy Flight" ShowInTaskbar="False"
              d:DesignHeight="450" d:DesignWidth="800"
+             Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
+             Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"
              KeyDown="Window_KeyDown" PreviewKeyDown="Window_PreviewKeyDown" Loaded="Window_Loaded" SourceInitialized="Window_SourceInitialized" Closing="Window_Closing">
     <Grid Margin="2">
         <Grid.RowDefinitions>
@@ -18,11 +22,18 @@
                 <ColumnDefinition Width="50*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBox Name="txtFilter" PreviewKeyDown="txtFilter_KeyDown" TextChanged="txtFilter_TextChanged"/>
+            <TextBox Name="txtFilter" PreviewKeyDown="txtFilter_KeyDown" TextChanged="txtFilter_TextChanged"
+                     Background="{DynamicResource {x:Static shell:VsBrushes.WindowKey}}"
+                     Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
             <StackPanel Orientation="Horizontal" Grid.Column="1">
                 <StackPanel.Resources>
                     <Style TargetType="{x:Type Button}">
                         <Setter Property="Margin" Value="2,0,0,0"/>
+                        <Setter Property="Background" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarMouseOverBackgroundBeginBrushKey}}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
+                    </Style>
+                    <Style TargetType="{x:Type Label}">
+                        <Setter Property="Foreground" Value="{DynamicResource {x:Static shell:VsBrushes.GrayTextKey}}"/>
                     </Style>
                 </StackPanel.Resources>
                 <Label>|</Label>
@@ -34,14 +45,17 @@
                 <Button Click="Button_Click">Settings</Button>
             </StackPanel>
         </Grid>
-        <Border Grid.Row="1" Padding="2,2,2,2" BorderThickness="2,2,2,2" CornerRadius="2,2,2,2">
+        <Border Grid.Row="1" Padding="2,2,2,2" BorderThickness="2,2,2,2" CornerRadius="2,2,2,2"
+                BorderBrush="{DynamicResource {x:Static platformUI:EnvironmentColors.ToolWindowBorderBrushKey}}">
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="35*"/>
+                    <ColumnDefinition Width="45*"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="65*"/>
+                    <ColumnDefinition Width="55*"/>
                 </Grid.ColumnDefinitions>
-                <ListBox Name="lstFiles" ItemsSource="{Binding Path=ViewSource.View}" SelectionChanged="lstFiles_SelectionChanged" MouseDoubleClick="lstFiles_MouseDoubleClick" AlternationCount="1000">
+                <ListBox Name="lstFiles" ItemsSource="{Binding Path=ViewSource.View}" SelectionChanged="lstFiles_SelectionChanged" MouseDoubleClick="lstFiles_MouseDoubleClick" AlternationCount="1000"
+                         Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
+                         Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}">
                     <ListBox.Resources>
                         <local:QuickOpenKeyLabelConverter x:Key="QuickOpenKeyLabelConverter" />
                         <local:AlternationIndexToBrushConverter x:Key="AlternationIndexToBrushConverter" />
@@ -52,7 +66,8 @@
                             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                             <Style.Triggers>
                                 <Trigger Property="IsSelected" Value="True">
-                                    <Setter Property="Background" Value="LightBlue" />
+                                    <Setter Property="Background" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarMouseDownBackgroundGradientBrushKey}}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}" />
                                 </Trigger>
                             </Style.Triggers>
                         </Style>
@@ -67,10 +82,15 @@
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
-                <GridSplitter Grid.Column="1" Width="2" />
-                <TextBlock Grid.Column="2" Text="{Binding Path=DebugString}" FontFamily="Cascadia Mono" />
+                <GridSplitter Grid.Column="1" Width="4"
+                              HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                              ResizeBehavior="PreviousAndNext"
+                              Background="{DynamicResource {x:Static platformUI:EnvironmentColors.ToolWindowBorderBrushKey}}"/>
+                <TextBlock Grid.Column="2" Text="{Binding Path=DebugString}" FontFamily="Cascadia Mono"
+                           Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
             </Grid>
         </Border>
-        <TextBlock Grid.Row="2" Text="{Binding Path=SelectedItemFullPath}" />
+        <TextBlock Grid.Row="2" Text="{Binding Path=SelectedItemFullPath}"
+                   Foreground="{DynamicResource {x:Static shell:VsBrushes.GrayTextKey}}"/>
     </Grid>
 </Window>
