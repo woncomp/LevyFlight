@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
     <Metadata>
-        <Identity Id="LevyFlight.c465b513-4725-4161-a638-b4ef189a68f6" Version="1.0.12" Language="en-US" Publisher="Lexical Works" />
+        <Identity Id="LevyFlight.c465b513-4725-4161-a638-b4ef189a68f6" Version="1.0.14" Language="en-US" Publisher="Lexical Works" />
         <DisplayName>Levy Flight</DisplayName>
         <Description xml:space="preserve">Jump back and forth in a C++ solution</Description>
     </Metadata>
