@@ -40,6 +40,23 @@ namespace LevyFlight
         /// Command menu group (command set GUID).
         /// </summary>
         public static readonly Guid CommandSet = new Guid("e0650b9a-53f3-4f9e-a1ea-e8a9be49290c");
+        /// <summary>
+        /// Toggle Bookmark Command ID.
+        /// </summary>
+        public const int ToggleBookmarkCommandId = 0x0110;
+        public const int NextBookmarkCommandId = 0x0111;
+        public const int PreviousBookmarkCommandId = 0x0112;
+        public const int ClearAllBookmarksCommandId = 0x0113;
+        public const int NextBookmarkInDocumentCommandId = 0x0114;
+        public const int PreviousBookmarkInDocumentCommandId = 0x0115;
+        public const int NextBookmarkInFolderCommandId = 0x0116;
+        public const int PreviousBookmarkInFolderCommandId = 0x0117;
+
+        /// <summary>
+        /// Event raised when bookmarks are added, removed, or cleared.
+        /// The BookmarkTagger subscribes to this to refresh editor glyphs.
+        /// </summary>
+        public static event EventHandler BookmarksChanged;
 
         /// <summary>
         /// VS Package that provides this command, not null.
@@ -61,6 +78,20 @@ namespace LevyFlight
             var menuItem = new MenuCommand(this.Execute, menuCommandID);
             commandService.AddCommand(menuItem);
 
+            // Register toggle bookmark command handler
+            var toggleBookmarkCommandID = new CommandID(CommandSet, ToggleBookmarkCommandId);
+            var toggleBookmarkMenuItem = new MenuCommand(this.ToggleBookmarkHandler, toggleBookmarkCommandID);
+            commandService.AddCommand(toggleBookmarkMenuItem);
+
+            // Register bookmark navigation commands
+            commandService.AddCommand(new MenuCommand(NextBookmarkHandler, new CommandID(CommandSet, NextBookmarkCommandId)));
+            commandService.AddCommand(new MenuCommand(PreviousBookmarkHandler, new CommandID(CommandSet, PreviousBookmarkCommandId)));
+            commandService.AddCommand(new MenuCommand(ClearAllBookmarksHandler, new CommandID(CommandSet, ClearAllBookmarksCommandId)));
+            commandService.AddCommand(new MenuCommand(NextBookmarkInDocumentHandler, new CommandID(CommandSet, NextBookmarkInDocumentCommandId)));
+            commandService.AddCommand(new MenuCommand(PreviousBookmarkInDocumentHandler, new CommandID(CommandSet, PreviousBookmarkInDocumentCommandId)));
+            commandService.AddCommand(new MenuCommand(NextBookmarkInFolderHandler, new CommandID(CommandSet, NextBookmarkInFolderCommandId)));
+            commandService.AddCommand(new MenuCommand(PreviousBookmarkInFolderHandler, new CommandID(CommandSet, PreviousBookmarkInFolderCommandId)));
+
             SettingsManager settingsManager = new ShellSettingsManager(this.package);
             this.SettingsStore = settingsManager.GetWritableSettingsStore(SettingsScope.UserSettings);
             if (!SettingsStore.CollectionExists(SettingsCollectionName))
@@ -69,6 +100,12 @@ namespace LevyFlight
             }
 
             LoadBookmarks();
+        }
+
+        private void ToggleBookmarkHandler(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            ToggleBookmarkAtCurrentPosition();
         }
 
         /// <summary>
@@ -150,22 +187,75 @@ namespace LevyFlight
             ThreadHelper.ThrowIfNotOnUIThread();
             var textView = GetTextView();
             textView.GetCaretPos(out int lineNo, out int col);
-            textView.GetSelectedText(out string text);
 
             var doc = GetActiveIDE().ActiveDocument;
             var filePath = doc.FullName;
 
-            if (string.IsNullOrEmpty(text))
+            // Read the content of the current line for the bookmark name
+            string lineContent = "";
+            if (textView is IVsTextView tv)
             {
-                text = string.Format("{0} (Line:{1})", doc.Name, lineNo);
+                tv.GetBuffer(out IVsTextLines textLines);
+                if (textLines != null)
+                {
+                    textLines.GetLengthOfLine(lineNo, out int lineLength);
+                    if (lineLength > 0)
+                    {
+                        textLines.GetLineText(lineNo, 0, lineNo, lineLength, out lineContent);
+                        lineContent = lineContent?.Trim() ?? "";
+                    }
+                }
+            }
+
+            // Build a descriptive bookmark name: "filename: line content"
+            string bookmarkName;
+            if (!string.IsNullOrEmpty(lineContent))
+            {
+                // Truncate very long lines to keep the name reasonable
+                const int maxContentLength = 80;
+                if (lineContent.Length > maxContentLength)
+                    lineContent = lineContent.Substring(0, maxContentLength) + "...";
+                bookmarkName = string.Format("{0}: {1}", doc.Name, lineContent);
+            }
+            else
+            {
+                bookmarkName = string.Format("{0} (Line:{1})", doc.Name, lineNo);
             }
 
             var jumpItem = new JumpItem(Category.Bookmark, filePath);
+            jumpItem.Name = bookmarkName;
             jumpItem.SetPosition(lineNo, col);
             Bookmarks.Add(jumpItem);
             SaveBookmarks();
+            RaiseBookmarksChanged();
 
             return jumpItem;
+        }
+
+        public void ToggleBookmarkAtCurrentPosition()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var textView = GetTextView();
+            textView.GetCaretPos(out int lineNo, out int col);
+
+            var doc = GetActiveIDE().ActiveDocument;
+            var filePath = doc.FullName;
+
+            // Find existing bookmark at this file and line
+            var existing = Bookmarks.FirstOrDefault(b =>
+                b.FullPath.Equals(filePath, StringComparison.OrdinalIgnoreCase) &&
+                b.LineNumber == lineNo);
+
+            if (existing != null)
+            {
+                Bookmarks.Remove(existing);
+                SaveBookmarks();
+                RaiseBookmarksChanged();
+            }
+            else
+            {
+                AddBookmarkFromCurrentPosition();
+            }
         }
 
         public void SaveBookmarks()
@@ -185,6 +275,7 @@ namespace LevyFlight
                     Bookmarks.Add(JumpItem.MakeBookmark(line));
                 }
             }
+            RaiseBookmarksChanged();
         }
 
         public string GetCurrentFile()
@@ -386,6 +477,185 @@ namespace LevyFlight
                 else
                 {
                     //Debug.WriteLine(string.Format("  Item:{0} {1}", item.Name, item.Kind));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Raises the BookmarksChanged event to notify taggers to refresh glyphs.
+        /// </summary>
+        private static void RaiseBookmarksChanged()
+        {
+            BookmarksChanged?.Invoke(null, EventArgs.Empty);
+        }
+
+        // ===================== Bookmark Navigation Command Handlers =====================
+
+        private void NextBookmarkHandler(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            NavigateToBookmark(forward: true, filterMode: BookmarkFilterMode.All);
+        }
+
+        private void PreviousBookmarkHandler(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            NavigateToBookmark(forward: false, filterMode: BookmarkFilterMode.All);
+        }
+
+        private void ClearAllBookmarksHandler(object sender, EventArgs e)
+        {
+            Bookmarks.Clear();
+            SaveBookmarks();
+            RaiseBookmarksChanged();
+        }
+
+        private void NextBookmarkInDocumentHandler(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            NavigateToBookmark(forward: true, filterMode: BookmarkFilterMode.Document);
+        }
+
+        private void PreviousBookmarkInDocumentHandler(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            NavigateToBookmark(forward: false, filterMode: BookmarkFilterMode.Document);
+        }
+
+        private void NextBookmarkInFolderHandler(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            NavigateToBookmark(forward: true, filterMode: BookmarkFilterMode.Folder);
+        }
+
+        private void PreviousBookmarkInFolderHandler(object sender, EventArgs e)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            NavigateToBookmark(forward: false, filterMode: BookmarkFilterMode.Folder);
+        }
+
+        private enum BookmarkFilterMode
+        {
+            All,
+            Document,
+            Folder
+        }
+
+        /// <summary>
+        /// Navigates to the next or previous bookmark, optionally filtered by current document or folder.
+        /// Wraps around when reaching the end/beginning of the list.
+        /// </summary>
+        private void NavigateToBookmark(bool forward, BookmarkFilterMode filterMode)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (Bookmarks == null || Bookmarks.Count == 0)
+                return;
+
+            string currentFile = GetCurrentFile();
+            int currentLine = -1;
+            var textView = GetTextView();
+            if (textView != null)
+            {
+                textView.GetCaretPos(out currentLine, out _);
+            }
+
+            // Filter bookmarks based on mode
+            List<JumpItem> candidates;
+            switch (filterMode)
+            {
+                case BookmarkFilterMode.Document:
+                    candidates = Bookmarks
+                        .Where(b => currentFile != null && b.FullPath.Equals(currentFile, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                    break;
+                case BookmarkFilterMode.Folder:
+                    string currentFolder = currentFile != null ? Path.GetDirectoryName(currentFile) : null;
+                    candidates = Bookmarks
+                        .Where(b => currentFolder != null &&
+                                    Path.GetDirectoryName(b.FullPath).Equals(currentFolder, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                    break;
+                default:
+                    candidates = Bookmarks.ToList();
+                    break;
+            }
+
+            if (candidates.Count == 0)
+                return;
+
+            // Sort by file path then line number for consistent ordering
+            candidates = candidates
+                .OrderBy(b => b.FullPath, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(b => b.LineNumber)
+                .ToList();
+
+            // Find the current position in the sorted list
+            int currentIndex = -1;
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                var b = candidates[i];
+                if (currentFile != null &&
+                    b.FullPath.Equals(currentFile, StringComparison.OrdinalIgnoreCase) &&
+                    b.LineNumber == currentLine)
+                {
+                    currentIndex = i;
+                    break;
+                }
+            }
+
+            // If not on a bookmark, find the nearest one in the desired direction
+            int targetIndex;
+            if (currentIndex >= 0)
+            {
+                // Currently on a bookmark — move to next/previous
+                targetIndex = forward
+                    ? (currentIndex + 1) % candidates.Count
+                    : (currentIndex - 1 + candidates.Count) % candidates.Count;
+            }
+            else
+            {
+                // Not on a bookmark — find the first one after/before current position
+                if (forward)
+                {
+                    targetIndex = candidates.FindIndex(b =>
+                    {
+                        int cmp = string.Compare(b.FullPath, currentFile, StringComparison.OrdinalIgnoreCase);
+                        return cmp > 0 || (cmp == 0 && b.LineNumber > currentLine);
+                    });
+                    if (targetIndex < 0) targetIndex = 0; // Wrap to first
+                }
+                else
+                {
+                    targetIndex = candidates.FindLastIndex(b =>
+                    {
+                        int cmp = string.Compare(b.FullPath, currentFile, StringComparison.OrdinalIgnoreCase);
+                        return cmp < 0 || (cmp == 0 && b.LineNumber < currentLine);
+                    });
+                    if (targetIndex < 0) targetIndex = candidates.Count - 1; // Wrap to last
+                }
+            }
+
+            var target = candidates[targetIndex];
+            NavigateToJumpItem(target);
+        }
+
+        /// <summary>
+        /// Opens the file and navigates the caret to the bookmark's position.
+        /// </summary>
+        private void NavigateToJumpItem(JumpItem item)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var dte = GetActiveIDE();
+            var window = dte.ItemOperations.OpenFile(item.FullPath);
+            if (window != null)
+            {
+                window.Activate();
+                var textView = GetTextView();
+                if (textView != null && item.LineNumber >= 0)
+                {
+                    textView.SetCaretPos(item.LineNumber, Math.Max(0, item.CaretColumn));
+                    textView.CenterLines(item.LineNumber, 1);
                 }
             }
         }
