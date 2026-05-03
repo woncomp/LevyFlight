@@ -49,6 +49,7 @@
     <Compile Include="BookmarkGlyphFactory.cs" />
     <Compile Include="BookmarkTagger.cs" />
     <Compile Include="CommonMixin.cs" />
+    <Compile Include="ExtensionErrorHandler.cs" />
     <Compile Include="JumpItem.cs" />
     <Compile Include="LevyFlightWindow.xaml.cs">
       <DependentUpon>LevyFlightWindow.xaml</DependentUpon>

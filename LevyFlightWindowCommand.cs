@@ -76,25 +76,25 @@ namespace LevyFlight
             commandService = commandService ?? throw new ArgumentNullException(nameof(commandService));
 
             var menuCommandID = new CommandID(CommandSet, CommandId);
-            var menuItem = new MenuCommand(this.Execute, menuCommandID);
+            var menuItem = GuardedCommand(this.Execute, "Quick open command", menuCommandID);
             commandService.AddCommand(menuItem);
 
             // Register toggle bookmark command handler
             var toggleBookmarkCommandID = new CommandID(CommandSet, ToggleBookmarkCommandId);
-            var toggleBookmarkMenuItem = new MenuCommand(this.ToggleBookmarkHandler, toggleBookmarkCommandID);
+            var toggleBookmarkMenuItem = GuardedCommand(this.ToggleBookmarkHandler, "Toggle bookmark command", toggleBookmarkCommandID);
             commandService.AddCommand(toggleBookmarkMenuItem);
 
             // Register bookmark navigation commands
-            commandService.AddCommand(new MenuCommand(NextBookmarkHandler, new CommandID(CommandSet, NextBookmarkCommandId)));
-            commandService.AddCommand(new MenuCommand(PreviousBookmarkHandler, new CommandID(CommandSet, PreviousBookmarkCommandId)));
-            commandService.AddCommand(new MenuCommand(ClearAllBookmarksHandler, new CommandID(CommandSet, ClearAllBookmarksCommandId)));
-            commandService.AddCommand(new MenuCommand(NextBookmarkInDocumentHandler, new CommandID(CommandSet, NextBookmarkInDocumentCommandId)));
-            commandService.AddCommand(new MenuCommand(PreviousBookmarkInDocumentHandler, new CommandID(CommandSet, PreviousBookmarkInDocumentCommandId)));
-            commandService.AddCommand(new MenuCommand(NextBookmarkInFolderHandler, new CommandID(CommandSet, NextBookmarkInFolderCommandId)));
-            commandService.AddCommand(new MenuCommand(PreviousBookmarkInFolderHandler, new CommandID(CommandSet, PreviousBookmarkInFolderCommandId)));
+            commandService.AddCommand(GuardedCommand(NextBookmarkHandler, "Next bookmark command", new CommandID(CommandSet, NextBookmarkCommandId)));
+            commandService.AddCommand(GuardedCommand(PreviousBookmarkHandler, "Previous bookmark command", new CommandID(CommandSet, PreviousBookmarkCommandId)));
+            commandService.AddCommand(GuardedCommand(ClearAllBookmarksHandler, "Clear bookmarks command", new CommandID(CommandSet, ClearAllBookmarksCommandId)));
+            commandService.AddCommand(GuardedCommand(NextBookmarkInDocumentHandler, "Next document bookmark command", new CommandID(CommandSet, NextBookmarkInDocumentCommandId)));
+            commandService.AddCommand(GuardedCommand(PreviousBookmarkInDocumentHandler, "Previous document bookmark command", new CommandID(CommandSet, PreviousBookmarkInDocumentCommandId)));
+            commandService.AddCommand(GuardedCommand(NextBookmarkInFolderHandler, "Next folder bookmark command", new CommandID(CommandSet, NextBookmarkInFolderCommandId)));
+            commandService.AddCommand(GuardedCommand(PreviousBookmarkInFolderHandler, "Previous folder bookmark command", new CommandID(CommandSet, PreviousBookmarkInFolderCommandId)));
 
             // Register Bird's Eye View command handler
-            commandService.AddCommand(new MenuCommand(BirdsEyeViewHandler, new CommandID(CommandSet, BirdsEyeViewCommandId)));
+            commandService.AddCommand(GuardedCommand(BirdsEyeViewHandler, "Bird's Eye View command", new CommandID(CommandSet, BirdsEyeViewCommandId)));
 
             SettingsManager settingsManager = new ShellSettingsManager(this.package);
             this.SettingsStore = settingsManager.GetWritableSettingsStore(SettingsScope.UserSettings);
@@ -104,6 +104,11 @@ namespace LevyFlight
             }
 
             LoadBookmarks();
+        }
+
+        private static MenuCommand GuardedCommand(EventHandler handler, string context, CommandID commandId)
+        {
+            return new MenuCommand((sender, e) => ExtensionErrorHandler.Execute(() => handler(sender, e), context), commandId);
         }
 
         private void ToggleBookmarkHandler(object sender, EventArgs e)
@@ -159,6 +164,12 @@ namespace LevyFlight
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
 
             DTE IDE = Package.GetGlobalService(typeof(DTE)) as DTE;
+            if (IDE?.Solution == null || string.IsNullOrEmpty(IDE.Solution.FullName))
+            {
+                Debug.WriteLine("[LevyFlight] No loaded solution; command initialization skipped.");
+                return;
+            }
+
             SolutionFolder = Path.GetDirectoryName(IDE.Solution.FullName);
             ExtCacheFolder = Path.Combine(SolutionFolder, ".vs", Path.GetFileNameWithoutExtension(IDE.Solution.FileName), SettingsCollectionName);
             Directory.CreateDirectory(ExtCacheFolder);
@@ -264,21 +275,27 @@ namespace LevyFlight
 
         public void SaveBookmarks()
         {
-            var strs = Bookmarks.Select(x => x.ToString()).ToArray();
-            File.WriteAllLines(BookmarksFile, strs);
+            ExtensionErrorHandler.Execute(() =>
+            {
+                var strs = Bookmarks.Select(x => x.ToString()).ToArray();
+                File.WriteAllLines(BookmarksFile, strs);
+            }, "Save bookmarks");
         }
 
         private void LoadBookmarks()
         {
             Bookmarks = new List<JumpItem>();
-            var filePath = BookmarksFile;
-            if (File.Exists(filePath))
+            ExtensionErrorHandler.Execute(() =>
             {
-                foreach (var line in File.ReadAllLines(filePath))
+                var filePath = BookmarksFile;
+                if (File.Exists(filePath))
                 {
-                    Bookmarks.Add(JumpItem.MakeBookmark(line));
+                    foreach (var line in File.ReadAllLines(filePath))
+                    {
+                        Bookmarks.Add(JumpItem.MakeBookmark(line));
+                    }
                 }
-            }
+            }, "Load bookmarks");
             RaiseBookmarksChanged();
         }
 
@@ -452,7 +469,7 @@ namespace LevyFlight
 
             if (items == null)
             {
-                yield return null;
+                yield break;
             }
             ThreadHelper.ThrowIfNotOnUIThread();
             foreach (ProjectItem item in items)
@@ -490,7 +507,7 @@ namespace LevyFlight
         /// </summary>
         private static void RaiseBookmarksChanged()
         {
-            BookmarksChanged?.Invoke(null, EventArgs.Empty);
+            ExtensionErrorHandler.Execute(() => BookmarksChanged?.Invoke(null, EventArgs.Empty), "Bookmarks changed notification");
         }
 
         // ===================== Bookmark Navigation Command Handlers =====================
@@ -695,16 +712,19 @@ namespace LevyFlight
         {
             package.JoinableTaskFactory.RunAsync(async delegate
             {
-                ToolWindowPane window = await package.ShowToolWindowAsync(
-                    typeof(TreeSitterOutlineView),
-                    id: 0,
-                    create: true,
-                    cancellationToken: package.DisposalToken);
-
-                if (window?.Frame == null)
+                await ExtensionErrorHandler.ExecuteAsync(async () =>
                 {
-                    Debug.WriteLine("[BirdsEye] Cannot create Bird's Eye View tool window");
-                }
+                    ToolWindowPane window = await package.ShowToolWindowAsync(
+                        typeof(TreeSitterOutlineView),
+                        id: 0,
+                        create: true,
+                        cancellationToken: package.DisposalToken);
+
+                    if (window?.Frame == null)
+                    {
+                        Debug.WriteLine("[BirdsEye] Cannot create Bird's Eye View tool window");
+                    }
+                }, "Show Bird's Eye View");
             });
         }
     }

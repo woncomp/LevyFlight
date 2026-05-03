@@ -98,9 +98,9 @@ namespace LevyFlight
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
+                ThreadHelper.ThrowIfNotOnUIThread();
                 // Get VS services
                 _rdt = (IVsRunningDocumentTable)Package.GetGlobalService(typeof(SVsRunningDocumentTable));
                 _rdt?.AdviseRunningDocTableEvents(this, out _rdtCookie);
@@ -126,23 +126,30 @@ namespace LevyFlight
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
-            _diskChangeTimer.Stop();
-            _filterDebounceTimer.Stop();
-
-            StopWatchingCurrentFile();
-            UnsubscribeFromBuffer();
-
-            if (_rdt != null && _rdtCookie != 0)
+            try
             {
-                _rdt.UnadviseRunningDocTableEvents(_rdtCookie);
-                _rdtCookie = 0;
-            }
+                ThreadHelper.ThrowIfNotOnUIThread();
+                _diskChangeTimer.Stop();
+                _filterDebounceTimer.Stop();
 
-            _currentTree?.Dispose();
-            _currentTree = null;
-            _parser?.Dispose();
-            _parser = null;
+                StopWatchingCurrentFile();
+                UnsubscribeFromBuffer();
+
+                if (_rdt != null && _rdtCookie != 0)
+                {
+                    _rdt.UnadviseRunningDocTableEvents(_rdtCookie);
+                    _rdtCookie = 0;
+                }
+
+                _currentTree?.Dispose();
+                _currentTree = null;
+                _parser?.Dispose();
+                _parser = null;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[BirdsEye] OnUnloaded error: " + ex.Message);
+            }
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -151,9 +158,9 @@ namespace LevyFlight
 
         public int OnBeforeDocumentWindowShow(uint docCookie, int fFirstShow, IVsWindowFrame pFrame)
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
+                ThreadHelper.ThrowIfNotOnUIThread();
                 // Get the moniker (file path) from the RDT
                 _rdt.GetDocumentInfo(docCookie, out uint flags, out uint readLocks, out uint editLocks,
                     out string moniker, out IVsHierarchy hierarchy, out uint itemId, out IntPtr docData);
@@ -162,7 +169,9 @@ namespace LevyFlight
                     !string.Equals(moniker, _currentFilePath, StringComparison.OrdinalIgnoreCase))
                 {
                     // Active document changed — schedule a full re-parse
-                    Dispatcher.BeginInvoke(new Action(() => SwitchToDocument(moniker)), DispatcherPriority.Background);
+                    Dispatcher.BeginInvoke(new Action(() =>
+                        ExtensionErrorHandler.Execute(() => SwitchToDocument(moniker), "Switch Bird's Eye document")),
+                        DispatcherPriority.Background);
                 }
             }
             catch (Exception ex)
@@ -177,9 +186,9 @@ namespace LevyFlight
         public int OnBeforeLastDocumentUnlock(uint docCookie, uint dwRDTLockType, uint dwReadLocksRemaining, uint dwEditLocksRemaining) => VSConstants.S_OK;
         public int OnAfterSave(uint docCookie)
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
+                ThreadHelper.ThrowIfNotOnUIThread();
                 _rdt.GetDocumentInfo(docCookie, out uint flags, out uint readLocks, out uint editLocks,
                     out string moniker, out IVsHierarchy hierarchy, out uint itemId, out IntPtr docData);
 
@@ -203,9 +212,9 @@ namespace LevyFlight
 
         private void RefreshForActiveDocument()
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
+                ThreadHelper.ThrowIfNotOnUIThread();
                 var dte = (DTE)Package.GetGlobalService(typeof(DTE));
                 if (dte?.ActiveDocument != null)
                 {
@@ -251,7 +260,7 @@ namespace LevyFlight
             StartWatchingCurrentFile(filePath);
 
             // Full parse
-            FullParseAsync(filePath);
+            _ = ExtensionErrorHandler.ExecuteAsync(() => FullParseAsync(filePath), "Full Bird's Eye parse");
         }
 
         private void ShowNoOutline(string message)
@@ -275,9 +284,9 @@ namespace LevyFlight
 
         private void SubscribeToBuffer()
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
             try
             {
+                ThreadHelper.ThrowIfNotOnUIThread();
                 var textManager = (IVsTextManager)Package.GetGlobalService(typeof(SVsTextManager));
                 if (textManager == null) return;
 
@@ -353,7 +362,9 @@ namespace LevyFlight
 
         private void CurrentFileWatcher_FileChanged(object sender, FileSystemEventArgs e)
         {
-            Dispatcher.BeginInvoke(new Action(ScheduleFullParseFromDisk), DispatcherPriority.Background);
+            Dispatcher.BeginInvoke(new Action(() =>
+                ExtensionErrorHandler.Execute(ScheduleFullParseFromDisk, "Schedule Bird's Eye disk reparse")),
+                DispatcherPriority.Background);
         }
 
         private void ScheduleFullParseFromDisk()
@@ -369,7 +380,7 @@ namespace LevyFlight
         {
             _diskChangeTimer.Stop();
             if (IsCurrentSupportedFile(_currentFilePath))
-                FullParseAsync(_currentFilePath);
+                _ = ExtensionErrorHandler.ExecuteAsync(() => FullParseAsync(_currentFilePath), "Full Bird's Eye disk reparse");
         }
 
         private bool IsCurrentSupportedFile(string filePath)
@@ -387,7 +398,7 @@ namespace LevyFlight
         //  Parsing
         // ════════════════════════════════════════════════════════════════════
 
-        private async void FullParseAsync(string filePath)
+        private async System.Threading.Tasks.Task FullParseAsync(string filePath)
         {
             try
             {
@@ -622,7 +633,9 @@ namespace LevyFlight
             if (_suppressFollowCursor) return;
 
             // Dispatch to avoid reentry
-            Dispatcher.BeginInvoke(new Action(SyncSelectionToCaret), DispatcherPriority.Background);
+            Dispatcher.BeginInvoke(new Action(() =>
+                ExtensionErrorHandler.Execute(SyncSelectionToCaret, "Sync Bird's Eye selection to caret")),
+                DispatcherPriority.Background);
         }
 
         private void SyncSelectionToCaret()

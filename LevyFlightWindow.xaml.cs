@@ -307,22 +307,7 @@ namespace LevyFlight
             // Kick off tree-sitter C++ parse of the active document
             if (!string.IsNullOrEmpty(currentFile))
             {
-                _ = TreeSitterCodeParser.ParseAndListFunctionsAsync(currentFile).ContinueWith(async t =>
-                {
-                    var items = t.Result;
-                    if (items.Count > 0)
-                    {
-                        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-                        using (ViewSource.DeferRefresh())
-                        {
-                            foreach (var item in items)
-                            {
-                                AllJumpItems.Add(item);
-                            }
-                        }
-                        RefreshQuickOpenIndices();
-                    }
-                }, TaskScheduler.Default);
+                _ = ExtensionErrorHandler.ExecuteAsync(() => AddTreeSitterItemsAsync(currentFile), "Add Tree-sitter quick-open items");
             }
 
             // Start scaning the entire solution a little later
@@ -330,10 +315,33 @@ namespace LevyFlight
             timer.Interval = TimeSpan.FromSeconds(0.1);
             timer.Tick += (_, e2) =>
             {
-                timer.Stop();
-                _ = StartDiscoverFilesAsync(knownFiles);
+                ExtensionErrorHandler.Execute(() =>
+                {
+                    timer.Stop();
+                    _ = ExtensionErrorHandler.ExecuteAsync(() => StartDiscoverFilesAsync(knownFiles), "Discover solution files");
+                }, "Start delayed solution discovery");
             };
             timer.Start();
+        }
+
+        private async Task AddTreeSitterItemsAsync(string currentFile)
+        {
+            var items = await TreeSitterCodeParser.ParseAndListFunctionsAsync(currentFile);
+            if (items.Count == 0)
+                return;
+
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            if (!IsVisible)
+                return;
+
+            using (ViewSource.DeferRefresh())
+            {
+                foreach (var item in items)
+                {
+                    AllJumpItems.Add(item);
+                }
+            }
+            RefreshQuickOpenIndices();
         }
 
         private async Task StartDiscoverFilesAsync(HashSet<string> knownFiles)
@@ -405,28 +413,38 @@ namespace LevyFlight
 
         private async Task GoToAsync(JumpItem jumpItem)
         {
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-            var IDE = CMD.GetActiveIDE();
-            //IDE.ItemOperations.OpenFile(jumpItem.FullPath);
-
-            var doc = IDE.Documents.Open(jumpItem.FullPath);
-
-            while (IDE.ActiveDocument.FullName != jumpItem.FullPath)
+            try
             {
-                Debug.WriteLine("GoToAsync Wait: " + IDE.ActiveDocument.FullName);
-                await Task.Yield();
-            }
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                var IDE = CMD.GetActiveIDE();
+                //IDE.ItemOperations.OpenFile(jumpItem.FullPath);
 
-            if (jumpItem.LineNumber >= 0)
+                var doc = IDE.Documents.Open(jumpItem.FullPath);
+
+                while (IDE.ActiveDocument.FullName != jumpItem.FullPath)
+                {
+                    Debug.WriteLine("GoToAsync Wait: " + IDE.ActiveDocument.FullName);
+                    await Task.Yield();
+                }
+
+                if (jumpItem.LineNumber >= 0)
+                {
+                    var textView = cmd.GetTextView();
+                    if (textView != null)
+                    {
+                        textView.GetTextStream(0, 0, 13, 0, out string text);
+                        Debug.WriteLine("GoToAsync: " + text);
+                        textView.SetCaretPos(jumpItem.LineNumber, jumpItem.CaretColumn);
+                        textView.CenterLines(jumpItem.LineNumber, 0);
+                    }
+                }
+
+                Close();
+            }
+            catch (Exception ex)
             {
-                var textView = cmd.GetTextView();
-                textView.GetTextStream(0, 0, 13, 0, out string text);
-                Debug.WriteLine("GoToAsync: " + text);
-                textView.SetCaretPos(jumpItem.LineNumber, jumpItem.CaretColumn);
-                textView.CenterLines(jumpItem.LineNumber, 0);
+                ExtensionErrorHandler.Log("Navigate quick-open item", ex);
             }
-
-            Close();
         }
 
         /// <summary>
@@ -497,13 +515,16 @@ namespace LevyFlight
 
         private void FilterUpdateTimer_Tick(object sender, EventArgs e)
         {
-            filterUpdateTimer.Stop();
-            foreach (var jumpItem in AllJumpItems)
+            ExtensionErrorHandler.Execute(() =>
             {
-                jumpItem.UpdateScore();
-            }
-            ViewSource.View.Refresh();
-            RefreshQuickOpenIndices();
+                filterUpdateTimer.Stop();
+                foreach (var jumpItem in AllJumpItems)
+                {
+                    jumpItem.UpdateScore();
+                }
+                ViewSource.View.Refresh();
+                RefreshQuickOpenIndices();
+            }, "Quick-open filter update");
         }
 
         /// <summary>
@@ -540,18 +561,21 @@ namespace LevyFlight
 
         private void txtFilter_KeyDown(object sender, KeyEventArgs e)
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
+            ExtensionErrorHandler.Execute(() =>
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
 
-            if (e.Key == Key.Down)
-            {
-                e.Handled = true;
-                MoveSelection(lstFiles.SelectedIndex + 1);
-            }
-            else if (e.Key == Key.Up)
-            {
-                e.Handled = true;
-                MoveSelection(lstFiles.SelectedIndex - 1);
-            }
+                if (e.Key == Key.Down)
+                {
+                    e.Handled = true;
+                    MoveSelection(lstFiles.SelectedIndex + 1);
+                }
+                else if (e.Key == Key.Up)
+                {
+                    e.Handled = true;
+                    MoveSelection(lstFiles.SelectedIndex - 1);
+                }
+            }, "Quick-open filter key down");
         }
 
         private void lstFiles_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -565,76 +589,93 @@ namespace LevyFlight
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
-            if (e.Key == Key.Enter || e.Key == Key.Return)
+            ExtensionErrorHandler.Execute(() =>
             {
-                e.Handled = true;
-                var selectedJumpItem = lstFiles.SelectedItem as JumpItem;
-                if (selectedJumpItem != null)
-                {
-                    _ = GoToAsync(selectedJumpItem);
-                }
-            }
-            else if (e.Key == Key.Escape)
-            {
-                e.Handled = true;
-                Close();
-            }
-            else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && windowsKeyBindings.ContainsKey(e.Key))
-            {
-                e.Handled = windowsKeyBindings[e.Key]();
-            }
-            else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
-            {
-                var qi = GetQuickOpenItemForKey(e.Key);
-                if (qi != null)
+                ThreadHelper.ThrowIfNotOnUIThread();
+                if (e.Key == Key.Enter || e.Key == Key.Return)
                 {
                     e.Handled = true;
-                    _ = GoToAsync(qi);
+                    var selectedJumpItem = lstFiles.SelectedItem as JumpItem;
+                    if (selectedJumpItem != null)
+                    {
+                        _ = GoToAsync(selectedJumpItem);
+                    }
                 }
-            }
+                else if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    Close();
+                }
+                else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && windowsKeyBindings.ContainsKey(e.Key))
+                {
+                    e.Handled = windowsKeyBindings[e.Key]();
+                }
+                else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+                {
+                    var qi = GetQuickOpenItemForKey(e.Key);
+                    if (qi != null)
+                    {
+                        e.Handled = true;
+                        _ = GoToAsync(qi);
+                    }
+                }
+            }, "Quick-open window key down");
         }
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
-            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            ExtensionErrorHandler.Execute(() =>
             {
-                // Intercept before controls like TextBox process (e.g., Ctrl+Y = Redo)
-                var qi = GetQuickOpenItemForKey(e.Key);
-                if (qi != null)
+                ThreadHelper.ThrowIfNotOnUIThread();
+                if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
                 {
-                    e.Handled = true;
-                    _ = GoToAsync(qi);
+                    // Intercept before controls like TextBox process (e.g., Ctrl+Y = Redo)
+                    var qi = GetQuickOpenItemForKey(e.Key);
+                    if (qi != null)
+                    {
+                        e.Handled = true;
+                        _ = GoToAsync(qi);
+                    }
                 }
-            }
+            }, "Quick-open window preview key down");
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
-
-            txtFilter.Focus();
-            StartDiscoverFiles();
+            ExtensionErrorHandler.Execute(() =>
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                txtFilter.Focus();
+                StartDiscoverFiles();
+            }, "Quick-open window loaded");
         }
 
         private void Window_SourceInitialized(object sender, EventArgs e)
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
-            LoadWindowSettings();
+            ExtensionErrorHandler.Execute(() =>
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                LoadWindowSettings();
+            }, "Quick-open window source initialized");
         }
 
         private void Window_Closing(object sender, CancelEventArgs e)
         {
-            SaveWindowSettings();
-            Filter.Instance.Reset();
+            ExtensionErrorHandler.Execute(() =>
+            {
+                SaveWindowSettings();
+                Filter.Instance.Reset();
+            }, "Quick-open window closing");
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
-            var jumpItem = cmd.AddBookmarkFromCurrentPosition();
-            AllJumpItems.Add(jumpItem);
+            ExtensionErrorHandler.Execute(() =>
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                var jumpItem = cmd.AddBookmarkFromCurrentPosition();
+                AllJumpItems.Add(jumpItem);
+            }, "Add bookmark button");
         }
     }
 }

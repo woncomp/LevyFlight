@@ -81,8 +81,12 @@ namespace LevyFlight
             ThreadHelper.ThrowIfNotOnUIThread();
             var IDE = Package.GetGlobalService(typeof(DTE)) as DTE;
 
+            if (IDE?.Events == null)
+                return;
+
             _windowEvents = IDE.Events.WindowEvents;
-            _windowEvents.WindowActivated += OnWindowActivated;
+            _windowEvents.WindowActivated += (gotFocus, lostFocus) =>
+                ExtensionErrorHandler.Execute(() => OnWindowActivated(gotFocus, lostFocus), "Window activated transition tracking");
             _lastActiveDocument = IDE.ActiveDocument?.FullName;
             if(!string.IsNullOrEmpty(_lastActiveDocument))
             {
@@ -152,111 +156,123 @@ namespace LevyFlight
 
         private void SaveRecents()
         {
-            var strs = Recents.Select(x => ToRelativePath(x)).ToArray();
-            File.WriteAllLines(RecentsFile, strs);
+            ExtensionErrorHandler.Execute(() =>
+            {
+                var strs = Recents.Select(x => ToRelativePath(x)).ToArray();
+                File.WriteAllLines(RecentsFile, strs);
+            }, "Save recent files");
         }
 
         private void LoadRecents()
         {
             Recents = new List<string>();
-            var filePath = RecentsFile;
-            if (File.Exists(filePath))
+            ExtensionErrorHandler.Execute(() =>
             {
-                foreach (var line in File.ReadAllLines(filePath))
+                var filePath = RecentsFile;
+                if (File.Exists(filePath))
                 {
-                    Recents.Add(ToAbsolutePath(line));
+                    foreach (var line in File.ReadAllLines(filePath))
+                    {
+                        Recents.Add(ToAbsolutePath(line));
+                    }
                 }
-            }
+            }, "Load recent files");
         }
 
         public void SaveTransitions(int hash)
         {
-            var transitionFolder = TransitionFolder;
-            Directory.CreateDirectory(transitionFolder);
-            int hash8 = hash & TransitionHashMask;
-            var transitionFileName = Path.Combine(transitionFolder, $"{hash8:x4}.txt");
-
-            using (var writer = new StreamWriter(transitionFileName))
+            ExtensionErrorHandler.Execute(() =>
             {
-                foreach(var pair in TransitionMap)
+                var transitionFolder = TransitionFolder;
+                Directory.CreateDirectory(transitionFolder);
+                int hash8 = hash & TransitionHashMask;
+                var transitionFileName = Path.Combine(transitionFolder, $"{hash8:x4}.txt");
+
+                using (var writer = new StreamWriter(transitionFileName))
                 {
-                    var trSrcHash = pair.Key;
-                    var trList = pair.Value;
-                    if ((trSrcHash & hash8) == hash8)
+                    foreach(var pair in TransitionMap)
                     {
-                        writer.WriteLine($"SourceFile:{trList.SourceFile}");
-                        foreach (var tr in trList.Transitions)
+                        var trSrcHash = pair.Key;
+                        var trList = pair.Value;
+                        if ((trSrcHash & hash8) == hash8)
                         {
-                            writer.WriteLine($"{tr.Count,8}|{tr.Path}");
+                            writer.WriteLine($"SourceFile:{trList.SourceFile}");
+                            foreach (var tr in trList.Transitions)
+                            {
+                                writer.WriteLine($"{tr.Count,8}|{tr.Path}");
+                            }
+                            writer.WriteLine();
                         }
-                        writer.WriteLine();
                     }
                 }
-            }
+            }, "Save transitions");
         }
 
         private void LoadTransitions()
         {
             TransitionMap = new Dictionary<int, TransitionList>();
 
-            var transitionsFolder = TransitionFolder;
-            var migrationFolder = transitionsFolder + "_old";
-            if(Directory.Exists(migrationFolder))
+            ExtensionErrorHandler.Execute(() =>
             {
-                transitionsFolder = migrationFolder;
-            }
-            else
-            {
-                migrationFolder = null;
-            }
-            if(!Directory.Exists(transitionsFolder))
-            {
-                return;
-            }
-
-            foreach(var name in Directory.EnumerateFiles(transitionsFolder))
-            {
-                using (var reader = new StreamReader(name))
+                var transitionsFolder = TransitionFolder;
+                var migrationFolder = transitionsFolder + "_old";
+                if(Directory.Exists(migrationFolder))
                 {
-                    TransitionList currentList = null;
-                    while (!reader.EndOfStream)
-                    {
-                        var line = reader.ReadLine();
-                        if (string.IsNullOrWhiteSpace(line))
-                            continue;
+                    transitionsFolder = migrationFolder;
+                }
+                else
+                {
+                    migrationFolder = null;
+                }
+                if(!Directory.Exists(transitionsFolder))
+                {
+                    return;
+                }
 
-                        if (line.StartsWith("SourceFile:"))
+                foreach(var name in Directory.EnumerateFiles(transitionsFolder))
+                {
+                    using (var reader = new StreamReader(name))
+                    {
+                        TransitionList currentList = null;
+                        while (!reader.EndOfStream)
                         {
-                            var sourceFile = line.Substring("SourceFile:".Length).Trim();
-                            currentList = new TransitionList(sourceFile);
-                            TransitionMap[sourceFile.GetHashCode()] = currentList;
-                        }
-                        else if (currentList != null)
-                        {
-                            var parts = line.Split('|');
-                            if (parts.Length == 2 && int.TryParse(parts[0].Trim(), out int count))
+                            var line = reader.ReadLine();
+                            if (string.IsNullOrWhiteSpace(line))
+                                continue;
+
+                            if (line.StartsWith("SourceFile:"))
                             {
-                                var path = parts[1].Trim();
-                                if (!string.IsNullOrEmpty(path))
+                                var sourceFile = line.Substring("SourceFile:".Length).Trim();
+                                currentList = new TransitionList(sourceFile);
+                                TransitionMap[sourceFile.GetHashCode()] = currentList;
+                            }
+                            else if (currentList != null)
+                            {
+                                var parts = line.Split('|');
+                                if (parts.Length == 2 && int.TryParse(parts[0].Trim(), out int count))
                                 {
-                                    var record = new TransitionRecord(path) { Count = count };
-                                    currentList.Transitions.Add(record);
+                                    var path = parts[1].Trim();
+                                    if (!string.IsNullOrEmpty(path))
+                                    {
+                                        var record = new TransitionRecord(path) { Count = count };
+                                        currentList.Transitions.Add(record);
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            // Migration cleanup
-            if(migrationFolder != null)
-            {
-                Directory.Delete(migrationFolder, true);
-                for(int i=0;i<= TransitionHashMask;i++)
+                // Migration cleanup
+                if(migrationFolder != null)
                 {
-                    SaveTransitions(i);
+                    Directory.Delete(migrationFolder, true);
+                    for(int i=0;i<= TransitionHashMask;i++)
+                    {
+                        SaveTransitions(i);
+                    }
                 }
-            }
+            }, "Load transitions");
         }
     }
 }

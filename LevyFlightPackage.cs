@@ -3,6 +3,7 @@ using Microsoft.VisualStudio.Shell;
 using System;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Windows.Threading;
 using Task = System.Threading.Tasks.Task;
 
 namespace LevyFlight
@@ -32,6 +33,8 @@ namespace LevyFlight
     [ProvideToolWindow(typeof(TreeSitterOutlineView), Style = VsDockStyle.Tabbed, Window = "3ae79031-e1bc-11d0-8f78-00a0c9110057")]
     public sealed class LevyFlightPackage : AsyncPackage
     {
+        private static bool errorHandlersInstalled;
+
         /// <summary>
         /// LevyFlightPackage GUID string.
         /// </summary>
@@ -48,10 +51,46 @@ namespace LevyFlight
         /// <returns>A task representing the async work of package initialization, or an already completed task if there is none. Do not return null from this method.</returns>
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
-            // When initialized asynchronously, the current thread may be a background thread at this point.
-            // Do any initialization that requires the UI thread after switching to the UI thread.
-            await this.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-            await LevyFlightWindowCommand.InitializeAsync(this);
+            try
+            {
+                // When initialized asynchronously, the current thread may be a background thread at this point.
+                // Do any initialization that requires the UI thread after switching to the UI thread.
+                await this.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+                InstallErrorHandlers();
+                await LevyFlightWindowCommand.InitializeAsync(this);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (Exception ex)
+            {
+                ExtensionErrorHandler.Log("Package initialization", ex);
+            }
+        }
+
+        private static void InstallErrorHandlers()
+        {
+            if (errorHandlersInstalled)
+                return;
+
+            errorHandlersInstalled = true;
+            Dispatcher.CurrentDispatcher.UnhandledException += (sender, e) =>
+            {
+                if (!ExtensionErrorHandler.LooksLikeLevyFlight(e.Exception))
+                    return;
+
+                ExtensionErrorHandler.Log("Unhandled dispatcher exception", e.Exception);
+                e.Handled = true;
+            };
+
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (sender, e) =>
+            {
+                if (!ExtensionErrorHandler.LooksLikeLevyFlight(e.Exception))
+                    return;
+
+                ExtensionErrorHandler.Log("Unobserved task exception", e.Exception);
+                e.SetObserved();
+            };
         }
 
         #endregion
