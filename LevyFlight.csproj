@@ -59,7 +59,7 @@
     <Compile Include="LevyFlightPackage.cs" />
     <Compile Include="QuickOpenKeyLabelConverter.cs" />
     <Compile Include="TransitionStore.cs" />
-    <Compile Include="tree-sitter.cs" />
+    <Compile Include="TreeSitterSharp.cs" />
     <Compile Include="TreeSitterCodeParser.cs" />
     <Compile Include="TreeSitterOutlineCollector.cs" />
     <Compile Include="TreeSitterOutlineView.cs" />
@@ -118,11 +118,4 @@
   <Target Name="AfterBuild">
   </Target>
   -->
-  <ItemGroup>
-    <Content Include="libs\treesitter\$(Configuration)\tree-sitter.dll">
-      <Link>tree-sitter.dll</Link>
-      <IncludeInVSIX>true</IncludeInVSIX>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
 </Project>

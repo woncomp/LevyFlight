@@ -1,5 +1,5 @@
 using EnvDTE;
-using GitHub.TreeSitter;
+using TreeSitterSharp;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.Editor;

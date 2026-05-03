@@ -1,4 +1,4 @@
-using GitHub.TreeSitter;
+using TreeSitterSharp;
 using Microsoft.VisualStudio.Imaging;
 using System;
 using System.Collections.Generic;
