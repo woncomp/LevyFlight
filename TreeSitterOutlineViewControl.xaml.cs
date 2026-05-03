@@ -25,7 +25,7 @@ namespace LevyFlight
     /// 
     /// Responsibilities:
     ///  • Listen for active-document changes → full re-parse
-    ///  • Listen for text-buffer edits → incremental re-parse (5 s debounce)
+    ///  • Listen for active-document disk writes → full re-parse from disk
     ///  • Maintain a hierarchical symbol tree via <see cref="TreeSitterOutlineCollector"/>
     ///  • Filter / sort / follow-cursor / expand-collapse toggles
     ///  • Click-to-navigate
@@ -50,15 +50,13 @@ namespace LevyFlight
         private ITextBuffer _subscribedBuffer;
         private IWpfTextView _currentTextView;
 
-        // ─── Debounce timer (5 seconds after last edit) ────────────────────
-        private readonly DispatcherTimer _debounceTimer;
-        private const int DebounceDelaySeconds = 5;
+        // ─── Disk-change debounce (file watchers can fire multiple times) ──
+        private readonly DispatcherTimer _diskChangeTimer;
+        private const int DiskChangeDelayMilliseconds = 300;
+        private FileSystemWatcher _currentFileWatcher;
 
         // ─── Filter debounce (300ms) ───────────────────────────────────────
         private readonly DispatcherTimer _filterDebounceTimer;
-
-        // ─── Pending edits for incremental parsing ─────────────────────────
-        private readonly List<TSInputEdit> _pendingEdits = new List<TSInputEdit>();
 
         // ─── Follow-cursor suppression flag ────────────────────────────────
         private bool _suppressFollowCursor;
@@ -75,12 +73,12 @@ namespace LevyFlight
             InitializeComponent();
             OutlineTreeView.DataContext = _rootSymbols;
 
-            // 5-second debounce for re-parse after edits
-            _debounceTimer = new DispatcherTimer
+            // Debounce full re-parse after disk writes
+            _diskChangeTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromSeconds(DebounceDelaySeconds)
+                Interval = TimeSpan.FromMilliseconds(DiskChangeDelayMilliseconds)
             };
-            _debounceTimer.Tick += DebounceTimer_Tick;
+            _diskChangeTimer.Tick += DiskChangeTimer_Tick;
 
             // 300ms debounce for filter text
             _filterDebounceTimer = new DispatcherTimer
@@ -129,9 +127,10 @@ namespace LevyFlight
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            _debounceTimer.Stop();
+            _diskChangeTimer.Stop();
             _filterDebounceTimer.Stop();
 
+            StopWatchingCurrentFile();
             UnsubscribeFromBuffer();
 
             if (_rdt != null && _rdtCookie != 0)
@@ -176,7 +175,25 @@ namespace LevyFlight
         // Unused events — must still be implemented
         public int OnAfterFirstDocumentLock(uint docCookie, uint dwRDTLockType, uint dwReadLocksRemaining, uint dwEditLocksRemaining) => VSConstants.S_OK;
         public int OnBeforeLastDocumentUnlock(uint docCookie, uint dwRDTLockType, uint dwReadLocksRemaining, uint dwEditLocksRemaining) => VSConstants.S_OK;
-        public int OnAfterSave(uint docCookie) => VSConstants.S_OK;
+        public int OnAfterSave(uint docCookie)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            try
+            {
+                _rdt.GetDocumentInfo(docCookie, out uint flags, out uint readLocks, out uint editLocks,
+                    out string moniker, out IVsHierarchy hierarchy, out uint itemId, out IntPtr docData);
+
+                if (IsCurrentSupportedFile(moniker))
+                {
+                    ScheduleFullParseFromDisk();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[BirdsEye] OnAfterSave error: " + ex.Message);
+            }
+            return VSConstants.S_OK;
+        }
         public int OnAfterAttributeChange(uint docCookie, uint grfAttribs) => VSConstants.S_OK;
         public int OnAfterDocumentWindowHide(uint docCookie, IVsWindowFrame pFrame) => VSConstants.S_OK;
 
@@ -211,11 +228,11 @@ namespace LevyFlight
                 return;
 
             _currentFilePath = filePath;
-            _debounceTimer.Stop();
-            _pendingEdits.Clear();
+            _diskChangeTimer.Stop();
 
             // Unsubscribe from old buffer
             UnsubscribeFromBuffer();
+            StopWatchingCurrentFile();
 
             // Dispose old tree
             _currentTree?.Dispose();
@@ -231,6 +248,7 @@ namespace LevyFlight
 
             // Subscribe to the new buffer
             SubscribeToBuffer();
+            StartWatchingCurrentFile(filePath);
 
             // Full parse
             FullParseAsync(filePath);
@@ -270,7 +288,6 @@ namespace LevyFlight
                 if (_currentTextView == null) return;
 
                 _subscribedBuffer = _currentTextView.TextBuffer;
-                _subscribedBuffer.Changed += TextBuffer_Changed;
 
                 // Also track caret for follow-cursor
                 _currentTextView.Caret.PositionChanged += Caret_PositionChanged;
@@ -285,7 +302,6 @@ namespace LevyFlight
         {
             if (_subscribedBuffer != null)
             {
-                _subscribedBuffer.Changed -= TextBuffer_Changed;
                 _subscribedBuffer = null;
             }
             if (_currentTextView != null)
@@ -296,84 +312,86 @@ namespace LevyFlight
         }
 
         // ════════════════════════════════════════════════════════════════════
-        //  Text buffer change → build TSInputEdits, reset 5s debounce
+        //  Disk writes → full re-parse from the file on disk
         // ════════════════════════════════════════════════════════════════════
 
-        private void TextBuffer_Changed(object sender, TextContentChangedEventArgs e)
+        private void StartWatchingCurrentFile(string filePath)
         {
-            if (_currentTree == null) return;
-
-            foreach (var change in e.Changes)
+            try
             {
-                try
+                string directory = Path.GetDirectoryName(filePath);
+                string fileName = Path.GetFileName(filePath);
+                if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(fileName) || !Directory.Exists(directory))
+                    return;
+
+                _currentFileWatcher = new FileSystemWatcher(directory, fileName)
                 {
-                    // Build TSInputEdit (byte offsets = char offsets × 2 for UTF-16)
-                    var edit = new TSInputEdit();
-                    edit.start_byte = (uint)(change.OldPosition * 2);
-                    edit.old_end_byte = (uint)(change.OldEnd * 2);
-                    edit.new_end_byte = (uint)((change.OldPosition + change.NewLength) * 2);
-
-                    // Start point (in old snapshot)
-                    var oldStartLine = e.Before.GetLineFromPosition(change.OldPosition);
-                    edit.start_point = new TSPoint(
-                        (uint)oldStartLine.LineNumber,
-                        (uint)(change.OldPosition - oldStartLine.Start.Position));
-
-                    // Old end point
-                    var oldEndLine = e.Before.GetLineFromPosition(change.OldEnd);
-                    edit.old_end_point = new TSPoint(
-                        (uint)oldEndLine.LineNumber,
-                        (uint)(change.OldEnd - oldEndLine.Start.Position));
-
-                    // New end point (in new snapshot)
-                    int newEndPos = change.NewPosition + change.NewLength;
-                    var newEndLine = e.After.GetLineFromPosition(newEndPos);
-                    edit.new_end_point = new TSPoint(
-                        (uint)newEndLine.LineNumber,
-                        (uint)(newEndPos - newEndLine.Start.Position));
-
-                    // Apply edit to tree (keeps it in sync for future incremental parse)
-                    _currentTree.edit(edit);
-                    _pendingEdits.Add(edit);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine("[BirdsEye] TSInputEdit error: " + ex.Message);
-                }
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size
+                };
+                _currentFileWatcher.Changed += CurrentFileWatcher_FileChanged;
+                _currentFileWatcher.Created += CurrentFileWatcher_FileChanged;
+                _currentFileWatcher.Renamed += CurrentFileWatcher_FileChanged;
+                _currentFileWatcher.EnableRaisingEvents = true;
             }
-
-            // Reset the 5-second debounce timer
-            _debounceTimer.Stop();
-            _debounceTimer.Start();
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[BirdsEye] StartWatchingCurrentFile error: " + ex.Message);
+            }
         }
 
-        private void DebounceTimer_Tick(object sender, EventArgs e)
+        private void StopWatchingCurrentFile()
         {
-            _debounceTimer.Stop();
-            IncrementalParseAsync();
+            if (_currentFileWatcher == null) return;
+
+            _currentFileWatcher.EnableRaisingEvents = false;
+            _currentFileWatcher.Changed -= CurrentFileWatcher_FileChanged;
+            _currentFileWatcher.Created -= CurrentFileWatcher_FileChanged;
+            _currentFileWatcher.Renamed -= CurrentFileWatcher_FileChanged;
+            _currentFileWatcher.Dispose();
+            _currentFileWatcher = null;
+        }
+
+        private void CurrentFileWatcher_FileChanged(object sender, FileSystemEventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(ScheduleFullParseFromDisk), DispatcherPriority.Background);
+        }
+
+        private void ScheduleFullParseFromDisk()
+        {
+            if (!IsCurrentSupportedFile(_currentFilePath))
+                return;
+
+            _diskChangeTimer.Stop();
+            _diskChangeTimer.Start();
+        }
+
+        private void DiskChangeTimer_Tick(object sender, EventArgs e)
+        {
+            _diskChangeTimer.Stop();
+            if (IsCurrentSupportedFile(_currentFilePath))
+                FullParseAsync(_currentFilePath);
+        }
+
+        private bool IsCurrentSupportedFile(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+                return false;
+
+            if (!string.Equals(filePath, _currentFilePath, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return SupportedExtensions.Contains(Path.GetExtension(filePath));
         }
 
         // ════════════════════════════════════════════════════════════════════
-        //  Parsing (full + incremental)
+        //  Parsing
         // ════════════════════════════════════════════════════════════════════
 
         private async void FullParseAsync(string filePath)
         {
             try
             {
-                string sourceText;
-                try
-                {
-                    sourceText = File.ReadAllText(filePath);
-                }
-                catch
-                {
-                    // Try to read from the text buffer instead
-                    if (_subscribedBuffer != null)
-                        sourceText = _subscribedBuffer.CurrentSnapshot.GetText();
-                    else
-                        return;
-                }
+                string sourceText = File.ReadAllText(filePath);
 
                 // Parse on background thread
                 var symbols = await System.Threading.Tasks.Task.Run(() =>
@@ -384,7 +402,7 @@ namespace LevyFlight
                     var root = tree.root_node();
                     var result = TreeSitterOutlineCollector.Collect(root, sourceText);
 
-                    // Store tree for incremental updates (pass ownership to UI thread)
+                    // Store tree for outline queries (pass ownership to UI thread)
                     return new ParseResult { Tree = tree, Symbols = result, SourceText = sourceText };
                 });
 
@@ -394,7 +412,6 @@ namespace LevyFlight
                 _currentTree?.Dispose();
                 _currentTree = symbols.Tree;
                 _currentSourceText = symbols.SourceText;
-                _pendingEdits.Clear();
 
                 RebuildOutlineTree(symbols.Symbols);
                 ShowOutline();
@@ -403,53 +420,6 @@ namespace LevyFlight
             catch (Exception ex)
             {
                 Debug.WriteLine("[BirdsEye] FullParseAsync error: " + ex.Message);
-            }
-        }
-
-        private async void IncrementalParseAsync()
-        {
-            try
-            {
-                if (_parser == null || _currentTree == null) return;
-
-                // Get current text from the buffer
-                string newSourceText;
-                if (_subscribedBuffer != null)
-                    newSourceText = _subscribedBuffer.CurrentSnapshot.GetText();
-                else if (!string.IsNullOrEmpty(_currentFilePath))
-                    newSourceText = File.ReadAllText(_currentFilePath);
-                else
-                    return;
-
-                var oldTree = _currentTree;
-
-                // Incremental parse on background thread
-                var symbols = await System.Threading.Tasks.Task.Run(() =>
-                {
-                    // parse_string with old tree → incremental
-                    var newTree = _parser.parse_string(oldTree, newSourceText);
-                    if (newTree == null) return null;
-
-                    var root = newTree.root_node();
-                    var result = TreeSitterOutlineCollector.Collect(root, newSourceText);
-
-                    return new ParseResult { Tree = newTree, Symbols = result, SourceText = newSourceText };
-                });
-
-                if (symbols == null) return;
-
-                // Swap trees
-                _currentTree?.Dispose();
-                _currentTree = symbols.Tree;
-                _currentSourceText = symbols.SourceText;
-                _pendingEdits.Clear();
-
-                // Preserve expand/collapse state across rebuild
-                RebuildOutlineTree(symbols.Symbols);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("[BirdsEye] IncrementalParseAsync error: " + ex.Message);
             }
         }
 
