@@ -102,6 +102,7 @@ namespace LevyFlight
             {
                 SettingsStore.CreateCollection(SettingsCollectionName);
             }
+            LevyFlightOptions.Load();
 
             LoadBookmarks();
         }

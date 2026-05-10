@@ -51,6 +51,10 @@
     <Compile Include="CommonMixin.cs" />
     <Compile Include="ExtensionErrorHandler.cs" />
     <Compile Include="JumpItem.cs" />
+    <Compile Include="LevyFlightOptions.cs" />
+    <Compile Include="LevyFlightSettingsWindow.xaml.cs">
+      <DependentUpon>LevyFlightSettingsWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="LevyFlightWindow.xaml.cs">
       <DependentUpon>LevyFlightWindow.xaml</DependentUpon>
     </Compile>
@@ -60,6 +64,7 @@
     <Compile Include="LevyFlightPackage.cs" />
     <Compile Include="QuickOpenKeyLabelConverter.cs" />
     <Compile Include="TransitionStore.cs" />
+    <Compile Include="TreeSitterDiagnostics.cs" />
     <Compile Include="TreeSitterSharp.cs" />
     <Compile Include="TreeSitterCodeParser.cs" />
     <Compile Include="TreeSitterOutlineCollector.cs" />
@@ -102,6 +107,10 @@
   </ItemGroup>
   <ItemGroup>
     <Page Include="LevyFlightWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>XamlIntelliSenseFileGenerator</Generator>
+    </Page>
+    <Page Include="LevyFlightSettingsWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>XamlIntelliSenseFileGenerator</Generator>
     </Page>

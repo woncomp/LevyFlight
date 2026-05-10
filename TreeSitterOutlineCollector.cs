@@ -40,6 +40,7 @@ namespace LevyFlight
                             p.set_language(lang);
                         }
                         parseTree = p.parse_string(null, text);
+                        TreeSitterDiagnostics.SaveParse(null, text, parseTree, "OutlineCollector");
                         ownTree = true;
                     }
 

@@ -668,14 +668,17 @@ namespace LevyFlight
             }, "Quick-open window closing");
         }
 
-        private void Button_Click(object sender, RoutedEventArgs e)
+        private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
             ExtensionErrorHandler.Execute(() =>
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
-                var jumpItem = cmd.AddBookmarkFromCurrentPosition();
-                AllJumpItems.Add(jumpItem);
-            }, "Add bookmark button");
+                var window = new LevyFlightSettingsWindow
+                {
+                    Owner = this
+                };
+                window.ShowDialog();
+            }, "Open Levy Flight settings");
         }
     }
 }

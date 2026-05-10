@@ -46,7 +46,7 @@
                 <Button>Bookmarks</Button>
                 <Button>Edits</Button>
                 <Label>|</Label>
-                <Button Click="Button_Click">Settings</Button>
+                <Button Click="SettingsButton_Click">Settings</Button>
             </StackPanel>
         </Grid>
         <Border Grid.Row="1" Padding="2,2,2,2" BorderThickness="2,2,2,2" CornerRadius="2,2,2,2"

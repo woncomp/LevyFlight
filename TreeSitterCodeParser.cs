@@ -90,6 +90,8 @@ namespace LevyFlight
                             if (tree == null)
                                 return results;
 
+                            TreeSitterDiagnostics.SaveParse(filePath, sourceText, tree, "QuickOpen");
+
                             var root = tree.root_node();
                             var scopeStack = new List<string>();
                             CollectFunctions(root, sourceText, filePath, scopeStack, results);

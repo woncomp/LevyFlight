@@ -410,6 +410,8 @@ namespace LevyFlight
                     var tree = _parser.parse_string(null, sourceText);
                     if (tree == null) return null;
 
+                    TreeSitterDiagnostics.SaveParse(filePath, sourceText, tree, "BirdsEye");
+
                     var root = tree.root_node();
                     var result = TreeSitterOutlineCollector.Collect(root, sourceText);
 
