@@ -794,7 +794,10 @@ namespace TreeSitterSharp
 
             while (i < end)
             {
+                int beforeTrivia = i;
                 i = SkipTrivia(text, i, end);
+                if (segmentStart == beforeTrivia)
+                    segmentStart = i;
                 if (i >= end)
                     break;
 
@@ -808,6 +811,12 @@ namespace TreeSitterSharp
                 }
 
                 if (classBody && TryReadAccessSpecifier(text, source, parent, i, end, out i))
+                {
+                    segmentStart = i;
+                    continue;
+                }
+
+                if (IsAtSegmentStart(text, segmentStart, i) && TrySkipStandaloneMacroInvocation(text, i, end, out i))
                 {
                     segmentStart = i;
                     continue;
@@ -829,13 +838,16 @@ namespace TreeSitterSharp
                     }
                 }
 
-                var compound = TryReadCompound(text, source, i, end);
-                if (compound != null)
+                if (IsAtSegmentStart(text, segmentStart, i))
                 {
-                    parent.Add(compound);
-                    i = compound.End;
-                    segmentStart = i;
-                    continue;
+                    var compound = TryReadCompound(text, source, i, end);
+                    if (compound != null)
+                    {
+                        parent.Add(compound);
+                        i = compound.End;
+                        segmentStart = i;
+                        continue;
+                    }
                 }
 
                 if (text[i] == '{')
@@ -876,6 +888,54 @@ namespace TreeSitterSharp
             foreach (var child in node.Children)
                 replacement.Add(child);
             return replacement;
+        }
+
+        private static bool IsAtSegmentStart(string text, int segmentStart, int position)
+        {
+            int firstToken = SkipTrivia(text, segmentStart, position);
+            return firstToken == position;
+        }
+
+        private static bool TrySkipStandaloneMacroInvocation(string text, int start, int end, out int next)
+        {
+            next = start;
+            int nameEnd = ReadIdentifier(text, start, end);
+            if (nameEnd <= start)
+                return false;
+
+            string name = Slice(text, start, nameEnd);
+            if (!LooksLikeMacroName(name))
+                return false;
+
+            int openParen = SkipWhitespace(text, nameEnd, end);
+            if (openParen >= end || text[openParen] != '(')
+                return false;
+
+            int lineEnd = LineEnd(text, openParen, end);
+            int closeParen = FindMatching(text, openParen, lineEnd, '(', ')');
+            if (closeParen < 0)
+                return false;
+
+            int rest = SkipWhitespace(text, closeParen + 1, lineEnd);
+            if (rest != lineEnd)
+                return false;
+
+            next = lineEnd < end ? lineEnd + 1 : lineEnd;
+            return true;
+        }
+
+        private static bool LooksLikeMacroName(string name)
+        {
+            bool hasUpper = false;
+            for (int i = 0; i < name.Length; i++)
+            {
+                char c = name[i];
+                if (char.IsLower(c))
+                    return false;
+                if (char.IsUpper(c))
+                    hasUpper = true;
+            }
+            return hasUpper;
         }
 
         private static ManagedNode TryReadCompound(string text, SourceMap source, int start, int end)
@@ -1018,7 +1078,7 @@ namespace TreeSitterSharp
 
         private static void AddDeclaration(string text, SourceMap source, ManagedNode parent, int start, int end, bool classBody)
         {
-            start = TrimStart(text, start, end);
+            start = SkipTrivia(text, start, end);
             int trimmedEnd = TrimEnd(text, start, end);
             if (trimmedEnd <= start)
                 return;
@@ -1069,20 +1129,30 @@ namespace TreeSitterSharp
                 return null;
 
             int closeParen = LastIndexOfChar(text, start, signatureEnd, ')');
-            if (closeParen < 0)
-                return null;
+            int openParen = -1;
+            int nameStart = -1;
+            int nameEnd = -1;
+            string name = null;
 
-            int openParen = FindMatchingReverse(text, closeParen, start, '(', ')');
-            if (openParen < 0)
-                return null;
+            while (closeParen >= start)
+            {
+                openParen = FindMatchingReverse(text, closeParen, start, '(', ')');
+                if (openParen < 0)
+                    return null;
 
-            int nameEnd = TrimEnd(text, start, openParen);
-            int nameStart = FindNameStartBefore(text, start, nameEnd);
-            if (nameStart < start)
-                return null;
+                nameEnd = TrimEnd(text, start, openParen);
+                nameStart = FindNameStartBefore(text, start, nameEnd);
+                if (nameStart >= start)
+                {
+                    name = Slice(text, nameStart, nameEnd).Trim();
+                    if (IsFunctionNameCandidate(name) && !IsInitializerListEntry(text, start, nameStart))
+                        break;
+                }
 
-            string name = Slice(text, nameStart, nameEnd).Trim();
-            if (name.Length == 0 || ControlKeywords.Contains(name))
+                closeParen = LastIndexOfChar(text, start, openParen, ')');
+            }
+
+            if (!IsFunctionNameCandidate(name))
                 return null;
 
             var node = new ManagedNode(source, "function_definition", start, end);
@@ -1248,6 +1318,28 @@ namespace TreeSitterSharp
                 || value.StartsWith("return", StringComparison.Ordinal);
         }
 
+        private static bool IsFunctionNameCandidate(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return false;
+
+            if (ControlKeywords.Contains(name))
+                return false;
+
+            // noexcept(false) and similar trailing specifiers can look like the
+            // last parameter list if we scan backward from the opening brace.
+            return name != "noexcept";
+        }
+
+        private static bool IsInitializerListEntry(string text, int start, int nameStart)
+        {
+            int i = nameStart - 1;
+            while (i >= start && char.IsWhiteSpace(text[i]))
+                i--;
+
+            return i >= start && (text[i] == ':' || text[i] == ',');
+        }
+
         private static int FindTemplateEnd(string text, int start, int end)
         {
             int lt = FindNextSignificant(text, start, end, '<');
@@ -1269,7 +1361,7 @@ namespace TreeSitterSharp
                     break;
                 }
             }
-            return TrimStart(text, best, end);
+            return SkipTrivia(text, best, end);
         }
 
         private static int FindNameStartBefore(string text, int start, int end)
