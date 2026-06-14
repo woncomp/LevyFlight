@@ -468,7 +468,7 @@ namespace LevyFlight
             this.Width = width;
             this.Height = height;
 
-            this.WindowState = (WindowState)settings.GetInt32(COLL, "WindowState", 0);
+            this.WindowState = WindowState.Normal;
         }
 
         /// <summary>

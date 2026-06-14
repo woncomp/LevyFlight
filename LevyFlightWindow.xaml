@@ -5,9 +5,6 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:LevyFlight"
              xmlns:imaging="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.Imaging"
-             xmlns:theming="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Imaging"
-             xmlns:utilities="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Utilities"
-             xmlns:catalog="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.ImageCatalog"
              xmlns:platformUI="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
              xmlns:shell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
              mc:Ignorable="d" Title="Levy Flight" ShowInTaskbar="False"
@@ -59,12 +56,10 @@
                 </Grid.ColumnDefinitions>
                 <ListBox Name="lstFiles" ItemsSource="{Binding Path=ViewSource.View}" SelectionChanged="lstFiles_SelectionChanged" MouseDoubleClick="lstFiles_MouseDoubleClick" AlternationCount="1000"
                          Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
-                         Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"
-                         theming:ImageThemingUtilities.ImageBackgroundColor="{Binding Background, RelativeSource={RelativeSource Self}, Converter={StaticResource BrushToColorConverter}}">
+                         Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}">
                     <ListBox.Resources>
                         <local:QuickOpenKeyLabelConverter x:Key="QuickOpenKeyLabelConverter" />
                         <local:AlternationIndexToBrushConverter x:Key="AlternationIndexToBrushConverter" />
-                        <utilities:BrushToColorConverter x:Key="BrushToColorConverter"/>
                     </ListBox.Resources>
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
