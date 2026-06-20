@@ -412,7 +412,6 @@ namespace LevyFlight
 
         private static void HandleFunction(TSNode node, string src, IList<OutlineSymbolItem> siblings, AccessLevel access)
         {
-            // Re-use the same pitfall-aware logic from TreeSitterCodeParser
             var typeNode = node.child_by_field_name("type");
 
             // Filter out macro-like false positives (no return type and not a constructor/destructor/operator)
@@ -422,15 +421,99 @@ namespace LevyFlight
                     return;
             }
 
-            string funcName = TreeSitterCodeParser.GetFunctionName(node, src);
-            string returnType = TreeSitterCodeParser.GetReturnType(node, src);
-            string paramList = TreeSitterCodeParser.GetParameterList(node, src);
+            string returnType = !typeNode.is_null() ? typeNode.text(src).Trim() : "";
+            var (funcName, paramList) = ExtractNameAndParams(node, src);
 
             string displayName = (!string.IsNullOrEmpty(returnType) ? returnType + " " : "")
                                  + funcName + "(" + paramList + ")";
 
             var item = MakeItem(displayName, OutlineSymbolKind.Function, access, node);
             siblings.Add(item);
+        }
+
+        /// <summary>
+        /// Extracts function name and parameter list by drilling through the
+        /// declarator once, avoiding redundant child_by_field_name lookups.
+        /// </summary>
+        private static (string name, string paramList) ExtractNameAndParams(TSNode funcDefNode, string src)
+        {
+            var declarator = funcDefNode.child_by_field_name("declarator");
+            if (declarator.is_null())
+            {
+                // No declarator field — scan children for qualified_identifier or operator_cast
+                for (uint i = 0; i < funcDefNode.child_count(); i++)
+                {
+                    var child = funcDefNode.child(i);
+                    string childType = child.type();
+                    if (childType == "qualified_identifier" || childType == "operator_cast")
+                        return (child.text(src), "");
+                }
+                return ("<unknown>", "");
+            }
+
+            // Find the function_declarator (may be wrapped in pointer/reference declarators)
+            var funcDecl = FindFunctionDeclaratorLocal(declarator);
+            if (funcDecl.is_null())
+            {
+                // Not a function_declarator — just a name (e.g. function pointer variable)
+                return (TreeSitterCodeParser.ExtractDeclaratorName(declarator, src), "");
+            }
+
+            // Extract name from the function_declarator's inner declarator
+            var innerDecl = funcDecl.child_by_field_name("declarator");
+            string name = !innerDecl.is_null()
+                ? TreeSitterCodeParser.ExtractDeclaratorName(innerDecl, src)
+                : "<unknown>";
+
+            // Extract params from the function_declarator's parameters
+            var parameters = funcDecl.child_by_field_name("parameters");
+            string paramList = "";
+            if (!parameters.is_null())
+            {
+                var paramNames = new List<string>();
+                for (uint i = 0; i < parameters.child_count(); i++)
+                {
+                    var param = parameters.child(i);
+                    string paramType = param.type();
+                    if (paramType == "parameter_declaration" || paramType == "optional_parameter_declaration")
+                    {
+                        var paramTypeNode = param.child_by_field_name("type");
+                        if (!paramTypeNode.is_null())
+                            paramNames.Add(paramTypeNode.text(src).Trim());
+                        else
+                            paramNames.Add(param.text(src).Trim());
+                    }
+                    else if (paramType == "variadic_parameter_declaration")
+                    {
+                        paramNames.Add("...");
+                    }
+                }
+                paramList = string.Join(", ", paramNames);
+            }
+
+            return (name, paramList);
+        }
+
+        private static TSNode FindFunctionDeclaratorLocal(TSNode node)
+        {
+            if (node.is_null())
+                return node;
+            string type = node.type();
+            if (type == "function_declarator")
+                return node;
+            if (type == "pointer_declarator" || type == "reference_declarator")
+            {
+                var inner = node.child_by_field_name("declarator");
+                if (!inner.is_null())
+                    return FindFunctionDeclaratorLocal(inner);
+                for (uint i = 0; i < node.child_count(); i++)
+                {
+                    var result = FindFunctionDeclaratorLocal(node.child(i));
+                    if (!result.is_null())
+                        return result;
+                }
+            }
+            return new TSNode();
         }
 
         private static void HandleDeclaration(TSNode node, string src, IList<OutlineSymbolItem> siblings, AccessLevel access)
