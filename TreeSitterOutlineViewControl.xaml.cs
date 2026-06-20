@@ -33,7 +33,7 @@ namespace LevyFlight
     public partial class TreeSitterOutlineViewControl : UserControl, IVsRunningDocTableEvents
     {
         // ─── Symbol data ───────────────────────────────────────────────────
-        private readonly ObservableCollection<OutlineSymbolItem> _rootSymbols = new ObservableCollection<OutlineSymbolItem>();
+        private readonly RangeObservableCollection<OutlineSymbolItem> _rootSymbols = new RangeObservableCollection<OutlineSymbolItem>();
 
         // ─── Tree-sitter state ─────────────────────────────────────────────
         private TSParser _parser;
@@ -468,9 +468,7 @@ namespace LevyFlight
             if (!string.IsNullOrEmpty(filter))
                 ApplyFilter(displaySymbols, filter);
 
-            _rootSymbols.Clear();
-            foreach (var item in displaySymbols)
-                _rootSymbols.Add(item);
+            _rootSymbols.ReplaceAll(displaySymbols);
 
             // Restore expand/collapse state
             RestoreExpandState(_rootSymbols, "", expandState);
@@ -520,9 +518,7 @@ namespace LevyFlight
                 {
                     var childList = item.Children.ToList();
                     SortSymbolsAlpha(childList);
-                    item.Children.Clear();
-                    foreach (var c in childList)
-                        item.Children.Add(c);
+                    item.Children.ReplaceAll(childList);
                 }
             }
         }
@@ -572,9 +568,7 @@ namespace LevyFlight
                 {
                     var childList = item.Children.ToList();
                     childMatch = ApplyFilter(childList, filter);
-                    item.Children.Clear();
-                    foreach (var c in childList)
-                        item.Children.Add(c);
+                    item.Children.ReplaceAll(childList);
                 }
 
                 if (selfMatch || childMatch)

@@ -60,6 +60,7 @@
     </Compile>
     <Compile Include="LevyFlightWindowCommand.cs" />
     <Compile Include="OutlineSymbolItem.cs" />
+    <Compile Include="RangeObservableCollection.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="LevyFlightPackage.cs" />
     <Compile Include="QuickOpenKeyLabelConverter.cs" />

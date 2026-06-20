@@ -52,7 +52,7 @@ namespace LevyFlight
             _name = name;
             Kind = kind;
             Access = access;
-            Children = new ObservableCollection<OutlineSymbolItem>();
+            Children = new RangeObservableCollection<OutlineSymbolItem>();
         }
 
         /// <summary>Display name (e.g. "void foo(int)" or "MyClass").</summary>
@@ -73,7 +73,7 @@ namespace LevyFlight
         public int EndLine { get; set; }
 
         /// <summary>Hierarchical children (e.g. class members).</summary>
-        public ObservableCollection<OutlineSymbolItem> Children { get; }
+        public RangeObservableCollection<OutlineSymbolItem> Children { get; }
 
         public bool IsExpanded
         {
