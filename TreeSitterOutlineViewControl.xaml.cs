@@ -35,11 +35,12 @@ namespace LevyFlight
         // ─── Symbol data ───────────────────────────────────────────────────
         private readonly ObservableCollection<OutlineSymbolItem> _rootSymbols = new ObservableCollection<OutlineSymbolItem>();
 
-        // ─── Tree-sitter state (owned, disposed on document switch) ────────
+        // ─── Tree-sitter state ─────────────────────────────────────────────
         private TSParser _parser;
-        private TSTree _currentTree;
-        private string _currentSourceText;
         private string _currentFilePath;
+
+        // ─── Cached symbols (source of truth after initial parse) ────────
+        private List<OutlineSymbolItem> _cachedSymbols;
 
         // ─── VS services ───────────────────────────────────────────────────
         private IVsRunningDocumentTable _rdt;
@@ -141,8 +142,7 @@ namespace LevyFlight
                     _rdtCookie = 0;
                 }
 
-                _currentTree?.Dispose();
-                _currentTree = null;
+                _cachedSymbols = null;
                 _parser?.Dispose();
                 _parser = null;
             }
@@ -243,10 +243,8 @@ namespace LevyFlight
             UnsubscribeFromBuffer();
             StopWatchingCurrentFile();
 
-            // Dispose old tree
-            _currentTree?.Dispose();
-            _currentTree = null;
-            _currentSourceText = null;
+            // Clear cached symbols
+            _cachedSymbols = null;
 
             string ext = Path.GetExtension(filePath);
             if (!SupportedExtensions.Contains(ext))
@@ -276,6 +274,15 @@ namespace LevyFlight
         {
             NoOutlineMessage.Visibility = Visibility.Collapsed;
             OutlineTreeView.Visibility = Visibility.Visible;
+        }
+
+        private void ShowLoading()
+        {
+            _rootSymbols.Clear();
+            NoOutlineMessage.Text = "Loading...";
+            NoOutlineMessage.Visibility = Visibility.Visible;
+            OutlineTreeView.Visibility = Visibility.Collapsed;
+            StatusText.Text = "";
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -402,11 +409,13 @@ namespace LevyFlight
         {
             try
             {
-                string sourceText = File.ReadAllText(filePath);
+                // Show loading indicator on UI thread
+                ShowLoading();
 
-                // Parse on background thread
+                // All heavy work on background thread
                 var symbols = await System.Threading.Tasks.Task.Run(() =>
                 {
+                    string sourceText = File.ReadAllText(filePath);
                     var tree = _parser.parse_string(null, sourceText);
                     if (tree == null) return null;
 
@@ -415,18 +424,17 @@ namespace LevyFlight
                     var root = tree.root_node();
                     var result = TreeSitterOutlineCollector.Collect(root, sourceText);
 
-                    // Store tree for outline queries (pass ownership to UI thread)
-                    return new ParseResult { Tree = tree, Symbols = result, SourceText = sourceText };
+                    // Dispose AST — we only need the symbol list
+                    tree.Dispose();
+
+                    return result;
                 });
 
                 if (symbols == null) return;
 
-                // Update on UI thread
-                _currentTree?.Dispose();
-                _currentTree = symbols.Tree;
-                _currentSourceText = symbols.SourceText;
-
-                RebuildOutlineTree(symbols.Symbols);
+                // Cache symbols and update UI
+                _cachedSymbols = symbols;
+                RebuildOutlineTree();
                 ShowOutline();
                 StatusText.Text = Path.GetFileName(filePath);
             }
@@ -436,34 +444,32 @@ namespace LevyFlight
             }
         }
 
-        private class ParseResult
-        {
-            public TSTree Tree;
-            public List<OutlineSymbolItem> Symbols;
-            public string SourceText;
-        }
-
         // ════════════════════════════════════════════════════════════════════
         //  Rebuild the ObservableCollection, preserving expand/collapse state
         // ════════════════════════════════════════════════════════════════════
 
-        private void RebuildOutlineTree(List<OutlineSymbolItem> newSymbols)
+        private void RebuildOutlineTree()
         {
+            if (_cachedSymbols == null) return;
+
             // Capture current expand/collapse state
             var expandState = new Dictionary<string, bool>();
             CaptureExpandState(_rootSymbols, "", expandState);
 
+            // Work from a copy of cached symbols
+            var displaySymbols = _cachedSymbols.ToList();
+
             // Apply sort if needed
             if (SortAlphaButton.IsChecked == true)
-                SortSymbolsAlpha(newSymbols);
+                SortSymbolsAlpha(displaySymbols);
 
             // Apply filter if needed
             string filter = FilterTextBox.Text.Trim();
             if (!string.IsNullOrEmpty(filter))
-                ApplyFilter(newSymbols, filter);
+                ApplyFilter(displaySymbols, filter);
 
             _rootSymbols.Clear();
-            foreach (var item in newSymbols)
+            foreach (var item in displaySymbols)
                 _rootSymbols.Add(item);
 
             // Restore expand/collapse state
@@ -523,13 +529,7 @@ namespace LevyFlight
 
         private void SortAlphaButton_Changed(object sender, RoutedEventArgs e)
         {
-            // Re-parse with current data to apply/unapply sorting
-            if (_currentTree != null && _currentSourceText != null)
-            {
-                var root = _currentTree.root_node();
-                var symbols = TreeSitterOutlineCollector.Collect(root, _currentSourceText);
-                RebuildOutlineTree(symbols);
-            }
+            RebuildOutlineTree();
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -551,11 +551,7 @@ namespace LevyFlight
 
         private void ApplyCurrentFilter()
         {
-            if (_currentTree == null || _currentSourceText == null) return;
-
-            var root = _currentTree.root_node();
-            var symbols = TreeSitterOutlineCollector.Collect(root, _currentSourceText);
-            RebuildOutlineTree(symbols);
+            RebuildOutlineTree();
         }
 
         /// <summary>
