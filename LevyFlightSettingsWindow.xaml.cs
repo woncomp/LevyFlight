@@ -10,6 +10,7 @@ namespace LevyFlight
         {
             InitializeComponent();
             DiagnosticCheckBox.IsChecked = LevyFlightOptions.Diagnostic;
+            EngineComboBox.SelectedIndex = LevyFlightOptions.TreeSitterEngine == TreeSitter.TreeSitterEngine.Managed ? 1 : 0;
         }
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -18,6 +19,9 @@ namespace LevyFlight
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
                 LevyFlightOptions.Diagnostic = DiagnosticCheckBox.IsChecked == true;
+                LevyFlightOptions.TreeSitterEngine = EngineComboBox.SelectedIndex == 1
+                    ? TreeSitter.TreeSitterEngine.Managed
+                    : TreeSitter.TreeSitterEngine.Native;
                 DialogResult = true;
             }, "Save Levy Flight settings");
         }

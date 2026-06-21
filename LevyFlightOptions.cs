@@ -7,7 +7,27 @@ namespace LevyFlight
     internal static class LevyFlightOptions
     {
         private const string DiagnosticKey = "Diagnostic";
+        private const string TreeSitterEngineKey = "TreeSitterEngine";
         private static bool diagnostic;
+        private static TreeSitter.TreeSitterEngine treeSitterEngine = TreeSitter.TreeSitterEngine.Native;
+
+        public static TreeSitter.TreeSitterEngine TreeSitterEngine
+        {
+            get { return treeSitterEngine; }
+            set
+            {
+                treeSitterEngine = value;
+                ExtensionErrorHandler.Execute(() =>
+                {
+                    ThreadHelper.ThrowIfNotOnUIThread();
+                    var settings = LevyFlightWindowCommand.Instance?.SettingsStore;
+                    if (settings == null)
+                        return;
+
+                    settings.SetInt32(LevyFlightWindowCommand.SettingsCollectionName, TreeSitterEngineKey, (int)value);
+                }, "Save TreeSitter engine option");
+            }
+        }
 
         public static bool Diagnostic
         {
@@ -37,6 +57,8 @@ namespace LevyFlight
                     return;
 
                 diagnostic = settings.GetBoolean(LevyFlightWindowCommand.SettingsCollectionName, DiagnosticKey, false);
+                treeSitterEngine = (TreeSitter.TreeSitterEngine)settings.GetInt32(
+                    LevyFlightWindowCommand.SettingsCollectionName, TreeSitterEngineKey, (int)TreeSitter.TreeSitterEngine.Native);
             }
             catch (Exception ex)
             {

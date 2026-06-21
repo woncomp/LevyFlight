@@ -69,7 +69,15 @@
     <Compile Include="LevyFlightPackage.cs" />
     <Compile Include="QuickOpenKeyLabelConverter.cs" />
     <Compile Include="TransitionStore.cs" />
+    <Compile Include="TreeSitter\\SyntaxNode.cs" />
+    <Compile Include="TreeSitter\\SyntaxPoint.cs" />
+    <Compile Include="TreeSitter\\SyntaxTree.cs" />
+    <Compile Include="TreeSitter\\TreeSitterEngine.cs" />
+    <Compile Include="TreeSitter\\TreeSitterNativeParser.cs" />
+    <Compile Include="TreeSitter\\TreeSitterParser.cs" />
+    <Compile Include="TreeSitter\\TreeSitterSharpParser.cs" />
     <Compile Include="TreeSitterDiagnostics.cs" />
+    <Compile Include="TreeSitterNative.cs" />
     <Compile Include="TreeSitterSharp.cs" />
     <Compile Include="TreeSitterCodeParser.cs" />
     <Compile Include="TreeSitterOutlineCollector.cs" />
@@ -106,6 +114,12 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="external\tree-sitter\tree-sitter.vcxproj">
+      <Project>{d62232bb-a060-4bd1-b72c-fab215bba550}</Project>
+      <Name>tree-sitter</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
     <VSCTCompile Include="LevyFlightPackage.vsct">
       <ResourceName>Menus.ctmenu</ResourceName>
     </VSCTCompile>
@@ -131,6 +145,13 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="'$(VSToolsPath)' != ''" />
+  <ItemGroup>
+    <Content Include="libs\treesitter\$(Configuration)\tree-sitter.dll">
+      <Link>tree-sitter.dll</Link>
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

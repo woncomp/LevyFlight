@@ -1,5 +1,5 @@
 using EnvDTE;
-using TreeSitterSharp;
+using LevyFlight.TreeSitter;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.Editor;
@@ -35,8 +35,6 @@ namespace LevyFlight
         // ─── Symbol data ───────────────────────────────────────────────────
         private readonly RangeObservableCollection<OutlineSymbolItem> _rootSymbols = new RangeObservableCollection<OutlineSymbolItem>();
 
-        // ─── Tree-sitter state ─────────────────────────────────────────────
-        private TSParser _parser;
         private string _currentFilePath;
 
         // ─── Cached symbols (source of truth after initial parse) ────────
@@ -109,13 +107,6 @@ namespace LevyFlight
                 var componentModel = (IComponentModel)Package.GetGlobalService(typeof(SComponentModel));
                 _editorAdaptersFactory = componentModel?.GetService<IVsEditorAdaptersFactoryService>();
 
-                // Initialize parser
-                _parser = new TSParser();
-                using (var lang = TSParser.CppLanguage())
-                {
-                    _parser.set_language(lang);
-                }
-
                 // Parse the currently active document right away
                 RefreshForActiveDocument();
             }
@@ -143,8 +134,6 @@ namespace LevyFlight
                 }
 
                 _cachedSymbols = null;
-                _parser?.Dispose();
-                _parser = null;
             }
             catch (Exception ex)
             {
@@ -416,17 +405,9 @@ namespace LevyFlight
                 var symbols = await System.Threading.Tasks.Task.Run(() =>
                 {
                     string sourceText = File.ReadAllText(filePath);
-                    var tree = _parser.parse_string(null, sourceText);
-                    if (tree == null) return null;
-
-                    TreeSitterDiagnostics.SaveParse(filePath, sourceText, tree, "BirdsEye");
-
-                    var root = tree.root_node();
-                    var result = TreeSitterOutlineCollector.Collect(root, sourceText);
-
-                    // Dispose AST — we only need the symbol list
-                    tree.Dispose();
-
+                    var tree = TreeSitterParser.Parse(sourceText);
+                    TreeSitterDiagnostics.SaveParse(filePath, sourceText, tree, "BirdsEye", TreeSitterParser.CurrentEngineName);
+                    var result = TreeSitterOutlineCollector.Collect(tree.Root);
                     return result;
                 });
 

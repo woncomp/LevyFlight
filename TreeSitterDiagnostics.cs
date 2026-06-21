@@ -1,13 +1,13 @@
+using LevyFlight.TreeSitter;
 using System;
 using System.IO;
 using System.Text;
-using TreeSitterSharp;
 
 namespace LevyFlight
 {
     internal static class TreeSitterDiagnostics
     {
-        public static void SaveParse(string filePath, string sourceText, TSTree tree, string caller)
+        public static void SaveParse(string filePath, string sourceText, SyntaxTree tree, string caller, string engineName)
         {
             if (!LevyFlightOptions.Diagnostic || tree == null)
                 return;
@@ -19,10 +19,11 @@ namespace LevyFlight
 
                 string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss-fff");
                 string safeName = MakeSafeName(Path.GetFileName(filePath));
-                string prefix = Path.Combine(directory, stamp + "-" + safeName);
+                string suffix = string.IsNullOrEmpty(engineName) ? "tree" : engineName.ToLowerInvariant();
+                string prefix = Path.Combine(directory, stamp + "-" + safeName + "." + suffix);
 
                 File.WriteAllText(prefix + ".source.txt", sourceText ?? string.Empty, Encoding.UTF8);
-                File.WriteAllText(prefix + ".tree.txt", BuildTreeDump(filePath, caller, sourceText, tree), Encoding.UTF8);
+                File.WriteAllText(prefix + ".tree.txt", BuildTreeDump(filePath, caller, tree), Encoding.UTF8);
             }, "Save Tree-sitter diagnostics");
         }
 
@@ -32,7 +33,7 @@ namespace LevyFlight
             return Path.Combine(root, "LevyFlight", "TreeSitterDiagnostics");
         }
 
-        private static string BuildTreeDump(string filePath, string caller, string sourceText, TSTree tree)
+        private static string BuildTreeDump(string filePath, string caller, SyntaxTree tree)
         {
             var builder = new StringBuilder();
             builder.AppendLine("File: " + (filePath ?? "<unknown>"));
@@ -40,42 +41,40 @@ namespace LevyFlight
             builder.AppendLine("Captured: " + DateTime.Now.ToString("O"));
             builder.AppendLine();
 
-            AppendNode(builder, tree.root_node(), sourceText ?? string.Empty, 0);
+            AppendNode(builder, tree.Root, 0);
             return builder.ToString();
         }
 
-        private static void AppendNode(StringBuilder builder, TSNode node, string sourceText, int depth)
+        private static void AppendNode(StringBuilder builder, SyntaxNode node, int depth)
         {
-            if (node.is_null())
+            if (node.IsNull)
                 return;
 
-            var start = node.start_point();
-            var end = node.end_point();
+            var start = node.Start;
+            var end = node.End;
             builder.Append(' ', depth * 2);
-            builder.Append(node.type());
+            builder.Append(node.Type);
             builder.Append(" [");
-            builder.Append(start.row + 1);
+            builder.Append(start.Row + 1);
             builder.Append(':');
-            builder.Append(start.column);
+            builder.Append(start.Column);
             builder.Append('-');
-            builder.Append(end.row + 1);
+            builder.Append(end.Row + 1);
             builder.Append(':');
-            builder.Append(end.column);
+            builder.Append(end.Column);
             builder.Append(']');
 
-            uint length = node.end_offset() - node.start_offset();
-            if (length > 0 && length <= 80)
+            if (node.Text.Length > 0 && node.Text.Length <= 80)
             {
                 builder.Append(" \"");
-                builder.Append(node.text(sourceText).Replace("\r", "\\r").Replace("\n", "\\n").Replace("\"", "\\\""));
+                builder.Append(node.Text.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\"", "\\\""));
                 builder.Append('"');
             }
             builder.AppendLine();
 
-            uint count = node.child_count();
-            for (uint i = 0; i < count; i++)
+            for (int i = 0; i < node.Children.Count; i++)
             {
-                AppendNode(builder, node.child(i), sourceText, depth + 1);
+                AppendNode(builder, node.Children[i], depth + 1);
             }
         }
 

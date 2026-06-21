@@ -16,10 +16,15 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <CheckBox x:Name="DiagnosticCheckBox"
-                  Content="Diagnostic"
-                  VerticalAlignment="Top"
-                  Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
+        <StackPanel VerticalAlignment="Top">
+            <CheckBox x:Name="DiagnosticCheckBox"
+                      Content="Diagnostic"
+                      Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
+            <ComboBox x:Name="EngineComboBox" Margin="0,12,0,0">
+                <ComboBoxItem Content="Native C Tree-sitter" />
+                <ComboBoxItem Content="Managed Tree-sitter" />
+            </ComboBox>
+        </StackPanel>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Width="76" Margin="0,0,8,0" IsDefault="True" Click="OkButton_Click">OK</Button>

@@ -1,4 +1,4 @@
-using TreeSitterSharp;
+﻿using LevyFlight.TreeSitter;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -17,41 +17,16 @@ namespace LevyFlight
         /// Parses <paramref name="sourceText"/> with tree-sitter and returns the
         /// outline symbol tree.  Runs on a background thread.
         /// </summary>
-        public static async Task<List<OutlineSymbolItem>> CollectAsync(string sourceText, TSTree existingTree, TSParser parser)
+        public static async Task<List<OutlineSymbolItem>> CollectAsync(string sourceText)
         {
-            // Capture values for the task
-            var text = sourceText;
-            var tree = existingTree;
-            var p = parser;
-
             return await Task.Run(() =>
             {
                 var results = new List<OutlineSymbolItem>();
                 try
                 {
-                    TSTree parseTree = tree;
-                    bool ownTree = false;
-
-                    if (parseTree == null)
-                    {
-                        // Full parse
-                        using (var lang = TSParser.CppLanguage())
-                        {
-                            p.set_language(lang);
-                        }
-                        parseTree = p.parse_string(null, text);
-                        TreeSitterDiagnostics.SaveParse(null, text, parseTree, "OutlineCollector");
-                        ownTree = true;
-                    }
-
-                    if (parseTree == null)
-                        return results;
-
-                    var root = parseTree.root_node();
-                    CollectSymbols(root, text, results, AccessLevel.Public, false);
-
-                    if (ownTree)
-                        parseTree.Dispose();
+                    var tree = TreeSitterParser.Parse(sourceText);
+                    TreeSitterDiagnostics.SaveParse(null, sourceText, tree, "OutlineCollector", TreeSitterParser.CurrentEngineName);
+                    CollectSymbols(tree.Root, results, AccessLevel.Public, false);
                 }
                 catch (Exception ex)
                 {
@@ -62,14 +37,14 @@ namespace LevyFlight
         }
 
         /// <summary>
-        /// Synchronous overload that accepts an already-parsed tree.
+        /// Synchronous overload that accepts an already-converted root node.
         /// </summary>
-        public static List<OutlineSymbolItem> Collect(TSNode root, string sourceText)
+        public static List<OutlineSymbolItem> Collect(SyntaxNode root)
         {
             var results = new List<OutlineSymbolItem>();
             try
             {
-                CollectSymbols(root, sourceText, results, AccessLevel.Public, false);
+                CollectSymbols(root, results, AccessLevel.Public, false);
             }
             catch (Exception ex)
             {
@@ -83,86 +58,85 @@ namespace LevyFlight
         // ────────────────────────────────────────────────────────────────────
 
         private static void CollectSymbols(
-            TSNode node,
-            string src,
+            SyntaxNode node,
             IList<OutlineSymbolItem> siblings,
             AccessLevel currentAccess,
             bool insideFunctionBody)
         {
-            uint childCount = node.child_count();
+            int childCount = node.Children.Count;
 
-            for (uint i = 0; i < childCount; i++)
+            for (int i = 0; i < childCount; i++)
             {
-                var child = node.child(i);
-                if (child.is_null()) continue;
+                var child = node.Children[(int)i];
+                if (child.IsNull) continue;
 
-                string type = child.type();
+                string type = child.Type;
 
                 switch (type)
                 {
                     // ── Scoped containers ──────────────────────────────────
                     case "namespace_definition":
-                        HandleNamespace(child, src, siblings, insideFunctionBody);
+                        HandleNamespace(child, siblings, insideFunctionBody);
                         break;
 
                     case "class_specifier":
-                        HandleClassOrStruct(child, src, siblings, OutlineSymbolKind.Class, currentAccess, insideFunctionBody);
+                        HandleClassOrStruct(child, siblings, OutlineSymbolKind.Class, currentAccess, insideFunctionBody);
                         break;
 
                     case "struct_specifier":
-                        HandleClassOrStruct(child, src, siblings, OutlineSymbolKind.Struct, currentAccess, insideFunctionBody);
+                        HandleClassOrStruct(child, siblings, OutlineSymbolKind.Struct, currentAccess, insideFunctionBody);
                         break;
 
                     case "union_specifier":
-                        HandleClassOrStruct(child, src, siblings, OutlineSymbolKind.Union, currentAccess, insideFunctionBody);
+                        HandleClassOrStruct(child, siblings, OutlineSymbolKind.Union, currentAccess, insideFunctionBody);
                         break;
 
                     case "enum_specifier":
-                        HandleEnum(child, src, siblings, currentAccess);
+                        HandleEnum(child, siblings, currentAccess);
                         break;
 
                     // ── Functions ───────────────────────────────────────────
                     case "function_definition":
                         if (!insideFunctionBody)
-                            HandleFunction(child, src, siblings, currentAccess);
+                            HandleFunction(child, siblings, currentAccess);
                         break;
 
                     // ── Declarations (variables, prototypes, fields) ───────
                     case "declaration":
                         if (!insideFunctionBody)
-                            HandleDeclaration(child, src, siblings, currentAccess);
+                            HandleDeclaration(child, siblings, currentAccess);
                         break;
 
                     case "field_declaration":
-                        HandleFieldDeclaration(child, src, siblings, currentAccess);
+                        HandleFieldDeclaration(child, siblings, currentAccess);
                         break;
 
                     // ── Preprocessor ────────────────────────────────────────
                     case "preproc_def":
-                        HandlePreprocDef(child, src, siblings);
+                        HandlePreprocDef(child, siblings);
                         break;
 
                     case "preproc_function_def":
-                        HandlePreprocFunctionDef(child, src, siblings);
+                        HandlePreprocFunctionDef(child, siblings);
                         break;
 
                     // ── Type aliases ────────────────────────────────────────
                     case "type_definition":
-                        HandleTypeDefinition(child, src, siblings, currentAccess);
+                        HandleTypeDefinition(child, siblings, currentAccess);
                         break;
 
                     case "alias_declaration":
-                        HandleAliasDeclaration(child, src, siblings, currentAccess);
+                        HandleAliasDeclaration(child, siblings, currentAccess);
                         break;
 
                     // ── Template wrapper ────────────────────────────────────
                     case "template_declaration":
-                        HandleTemplateDeclaration(child, src, siblings, currentAccess, insideFunctionBody);
+                        HandleTemplateDeclaration(child, siblings, currentAccess, insideFunctionBody);
                         break;
 
                     // ── Linkage specification (extern "C" { … }) ───────────
                     case "linkage_specification":
-                        HandleLinkageSpecification(child, src, siblings, currentAccess, insideFunctionBody);
+                        HandleLinkageSpecification(child, siblings, currentAccess, insideFunctionBody);
                         break;
 
                     // ── Access specifier (public:/private:/protected:) ──────
@@ -176,7 +150,7 @@ namespace LevyFlight
                     case "preproc_if":
                     case "preproc_else":
                     case "preproc_elif":
-                        CollectSymbols(child, src, siblings, currentAccess, insideFunctionBody);
+                        CollectSymbols(child, siblings, currentAccess, insideFunctionBody);
                         break;
 
                     default:
@@ -190,49 +164,49 @@ namespace LevyFlight
         //  Individual node-type handlers
         // ────────────────────────────────────────────────────────────────────
 
-        private static void HandleNamespace(TSNode node, string src, IList<OutlineSymbolItem> siblings, bool insideFunctionBody)
+        private static void HandleNamespace(SyntaxNode node, IList<OutlineSymbolItem> siblings, bool insideFunctionBody)
         {
-            var nameNode = node.child_by_field_name("name");
-            string name = !nameNode.is_null() ? nameNode.text(src) : "<anonymous>";
+            var nameNode = node.ChildByFieldName("name");
+            string name = !nameNode.IsNull ? nameNode.Text : "<anonymous>";
 
             var item = MakeItem(name, OutlineSymbolKind.Namespace, AccessLevel.Public, node);
 
             // Recurse into the namespace body
-            var body = node.child_by_field_name("body");
-            if (!body.is_null())
-                CollectSymbols(body, src, item.Children, AccessLevel.Public, insideFunctionBody);
+            var body = node.ChildByFieldName("body");
+            if (!body.IsNull)
+                CollectSymbols(body, item.Children, AccessLevel.Public, insideFunctionBody);
 
             siblings.Add(item);
         }
 
-        private static void HandleClassOrStruct(TSNode node, string src, IList<OutlineSymbolItem> siblings,
+        private static void HandleClassOrStruct(SyntaxNode node, IList<OutlineSymbolItem> siblings,
             OutlineSymbolKind kind, AccessLevel parentAccess, bool insideFunctionBody)
         {
-            var nameNode = node.child_by_field_name("name");
+            var nameNode = node.ChildByFieldName("name");
             // Forward declarations (no body) — skip or could be included
-            string name = !nameNode.is_null() ? nameNode.text(src) : "<anonymous>";
+            string name = !nameNode.IsNull ? nameNode.Text : "<anonymous>";
 
             var item = MakeItem(name, kind, parentAccess, node);
 
             // Find the body (field_declaration_list)
-            var body = node.child_by_field_name("body");
-            if (!body.is_null())
+            var body = node.ChildByFieldName("body");
+            if (!body.IsNull)
             {
                 // Default access: private for class, public for struct/union
                 AccessLevel defaultAccess = (kind == OutlineSymbolKind.Class) ? AccessLevel.Private : AccessLevel.Public;
                 AccessLevel access = defaultAccess;
 
-                uint bodyChildCount = body.child_count();
-                for (uint j = 0; j < bodyChildCount; j++)
+                int bodyChildCount = body.Children.Count;
+                for (int j = 0; j < bodyChildCount; j++)
                 {
-                    var member = body.child(j);
-                    if (member.is_null()) continue;
+                    var member = body.Children[(int)j];
+                    if (member.IsNull) continue;
 
-                    string memberType = member.type();
+                    string memberType = member.Type;
 
                     if (memberType == "access_specifier")
                     {
-                        access = ParseAccessSpecifier(member, src);
+                        access = ParseAccessSpecifier(member);
                         continue;
                     }
 
@@ -240,43 +214,43 @@ namespace LevyFlight
                     switch (memberType)
                     {
                         case "function_definition":
-                            HandleFunction(member, src, item.Children, access);
+                            HandleFunction(member, item.Children, access);
                             break;
 
                         case "field_declaration":
-                            HandleFieldDeclaration(member, src, item.Children, access);
+                            HandleFieldDeclaration(member, item.Children, access);
                             break;
 
                         case "declaration":
-                            HandleDeclaration(member, src, item.Children, access);
+                            HandleDeclaration(member, item.Children, access);
                             break;
 
                         case "class_specifier":
-                            HandleClassOrStruct(member, src, item.Children, OutlineSymbolKind.Class, access, false);
+                            HandleClassOrStruct(member, item.Children, OutlineSymbolKind.Class, access, false);
                             break;
 
                         case "struct_specifier":
-                            HandleClassOrStruct(member, src, item.Children, OutlineSymbolKind.Struct, access, false);
+                            HandleClassOrStruct(member, item.Children, OutlineSymbolKind.Struct, access, false);
                             break;
 
                         case "union_specifier":
-                            HandleClassOrStruct(member, src, item.Children, OutlineSymbolKind.Union, access, false);
+                            HandleClassOrStruct(member, item.Children, OutlineSymbolKind.Union, access, false);
                             break;
 
                         case "enum_specifier":
-                            HandleEnum(member, src, item.Children, access);
+                            HandleEnum(member, item.Children, access);
                             break;
 
                         case "template_declaration":
-                            HandleTemplateDeclaration(member, src, item.Children, access, false);
+                            HandleTemplateDeclaration(member, item.Children, access, false);
                             break;
 
                         case "type_definition":
-                            HandleTypeDefinition(member, src, item.Children, access);
+                            HandleTypeDefinition(member, item.Children, access);
                             break;
 
                         case "alias_declaration":
-                            HandleAliasDeclaration(member, src, item.Children, access);
+                            HandleAliasDeclaration(member, item.Children, access);
                             break;
 
                         case "friend_declaration":
@@ -284,11 +258,11 @@ namespace LevyFlight
                             break;
 
                         case "preproc_def":
-                            HandlePreprocDef(member, src, item.Children);
+                            HandlePreprocDef(member, item.Children);
                             break;
 
                         case "preproc_function_def":
-                            HandlePreprocFunctionDef(member, src, item.Children);
+                            HandlePreprocFunctionDef(member, item.Children);
                             break;
 
                         case "preproc_ifdef":
@@ -297,7 +271,7 @@ namespace LevyFlight
                         case "preproc_else":
                         case "preproc_elif":
                             // Recurse through preprocessor conditionals inside the class body
-                            CollectClassBody(member, src, item.Children, ref access);
+                            CollectClassBody(member, item.Children, ref access);
                             break;
 
                         default:
@@ -313,65 +287,65 @@ namespace LevyFlight
         /// Helper to recurse through preprocessor conditionals inside a class body,
         /// preserving access specifier state across conditional branches.
         /// </summary>
-        private static void CollectClassBody(TSNode node, string src, IList<OutlineSymbolItem> children, ref AccessLevel access)
+        private static void CollectClassBody(SyntaxNode node, IList<OutlineSymbolItem> children, ref AccessLevel access)
         {
-            uint count = node.child_count();
-            for (uint i = 0; i < count; i++)
+            int count = node.Children.Count;
+            for (int i = 0; i < count; i++)
             {
-                var child = node.child(i);
-                if (child.is_null()) continue;
-                string childType = child.type();
+                var child = node.Children[(int)i];
+                if (child.IsNull) continue;
+                string childType = child.Type;
 
                 if (childType == "access_specifier")
                 {
-                    access = ParseAccessSpecifier(child, src);
+                    access = ParseAccessSpecifier(child);
                     continue;
                 }
 
                 switch (childType)
                 {
                     case "function_definition":
-                        HandleFunction(child, src, children, access);
+                        HandleFunction(child, children, access);
                         break;
                     case "field_declaration":
-                        HandleFieldDeclaration(child, src, children, access);
+                        HandleFieldDeclaration(child, children, access);
                         break;
                     case "declaration":
-                        HandleDeclaration(child, src, children, access);
+                        HandleDeclaration(child, children, access);
                         break;
                     case "class_specifier":
-                        HandleClassOrStruct(child, src, children, OutlineSymbolKind.Class, access, false);
+                        HandleClassOrStruct(child, children, OutlineSymbolKind.Class, access, false);
                         break;
                     case "struct_specifier":
-                        HandleClassOrStruct(child, src, children, OutlineSymbolKind.Struct, access, false);
+                        HandleClassOrStruct(child, children, OutlineSymbolKind.Struct, access, false);
                         break;
                     case "union_specifier":
-                        HandleClassOrStruct(child, src, children, OutlineSymbolKind.Union, access, false);
+                        HandleClassOrStruct(child, children, OutlineSymbolKind.Union, access, false);
                         break;
                     case "enum_specifier":
-                        HandleEnum(child, src, children, access);
+                        HandleEnum(child, children, access);
                         break;
                     case "template_declaration":
-                        HandleTemplateDeclaration(child, src, children, access, false);
+                        HandleTemplateDeclaration(child, children, access, false);
                         break;
                     case "type_definition":
-                        HandleTypeDefinition(child, src, children, access);
+                        HandleTypeDefinition(child, children, access);
                         break;
                     case "alias_declaration":
-                        HandleAliasDeclaration(child, src, children, access);
+                        HandleAliasDeclaration(child, children, access);
                         break;
                     case "preproc_def":
-                        HandlePreprocDef(child, src, children);
+                        HandlePreprocDef(child, children);
                         break;
                     case "preproc_function_def":
-                        HandlePreprocFunctionDef(child, src, children);
+                        HandlePreprocFunctionDef(child, children);
                         break;
                     case "preproc_ifdef":
                     case "preproc_ifndef":
                     case "preproc_if":
                     case "preproc_else":
                     case "preproc_elif":
-                        CollectClassBody(child, src, children, ref access);
+                        CollectClassBody(child, children, ref access);
                         break;
                     default:
                         break;
@@ -379,28 +353,28 @@ namespace LevyFlight
             }
         }
 
-        private static void HandleEnum(TSNode node, string src, IList<OutlineSymbolItem> siblings, AccessLevel access)
+        private static void HandleEnum(SyntaxNode node, IList<OutlineSymbolItem> siblings, AccessLevel access)
         {
-            var nameNode = node.child_by_field_name("name");
-            string name = !nameNode.is_null() ? nameNode.text(src) : "<anonymous enum>";
+            var nameNode = node.ChildByFieldName("name");
+            string name = !nameNode.IsNull ? nameNode.Text : "<anonymous enum>";
 
             var item = MakeItem(name, OutlineSymbolKind.Enum, access, node);
 
             // Collect enumerators
-            var body = node.child_by_field_name("body");
-            if (!body.is_null())
+            var body = node.ChildByFieldName("body");
+            if (!body.IsNull)
             {
-                uint count = body.child_count();
-                for (uint j = 0; j < count; j++)
+                int count = body.Children.Count;
+                for (int j = 0; j < count; j++)
                 {
-                    var enumerator = body.child(j);
-                    if (enumerator.is_null()) continue;
-                    if (enumerator.type() == "enumerator")
+                    var enumerator = body.Children[j];
+                    if (enumerator.IsNull) continue;
+                    if (enumerator.Type == "enumerator")
                     {
-                        var eName = enumerator.child_by_field_name("name");
-                        if (!eName.is_null())
+                        var eName = enumerator.ChildByFieldName("name");
+                        if (!eName.IsNull)
                         {
-                            var eItem = MakeItem(eName.text(src), OutlineSymbolKind.EnumMember, AccessLevel.Public, enumerator);
+                            var eItem = MakeItem(eName.Text, OutlineSymbolKind.EnumMember, AccessLevel.Public, enumerator);
                             item.Children.Add(eItem);
                         }
                     }
@@ -410,19 +384,19 @@ namespace LevyFlight
             siblings.Add(item);
         }
 
-        private static void HandleFunction(TSNode node, string src, IList<OutlineSymbolItem> siblings, AccessLevel access)
+        private static void HandleFunction(SyntaxNode node, IList<OutlineSymbolItem> siblings, AccessLevel access)
         {
-            var typeNode = node.child_by_field_name("type");
+            var typeNode = node.ChildByFieldName("type");
 
             // Filter out macro-like false positives (no return type and not a constructor/destructor/operator)
-            if (typeNode.is_null())
+            if (typeNode.IsNull)
             {
-                if (!TreeSitterCodeParser.IsSpecialMemberFunction(node, src, null))
+                if (!TreeSitterCodeParser.IsSpecialMemberFunction(node, null))
                     return;
             }
 
-            string returnType = !typeNode.is_null() ? typeNode.text(src).Trim() : "";
-            var (funcName, paramList) = ExtractNameAndParams(node, src);
+            string returnType = !typeNode.IsNull ? typeNode.Text.Trim() : "";
+            var (funcName, paramList) = ExtractNameAndParams(node);
 
             string displayName = (!string.IsNullOrEmpty(returnType) ? returnType + " " : "")
                                  + funcName + "(" + paramList + ")";
@@ -435,53 +409,53 @@ namespace LevyFlight
         /// Extracts function name and parameter list by drilling through the
         /// declarator once, avoiding redundant child_by_field_name lookups.
         /// </summary>
-        private static (string name, string paramList) ExtractNameAndParams(TSNode funcDefNode, string src)
+        private static (string name, string paramList) ExtractNameAndParams(SyntaxNode funcDefNode)
         {
-            var declarator = funcDefNode.child_by_field_name("declarator");
-            if (declarator.is_null())
+            var declarator = funcDefNode.ChildByFieldName("declarator");
+            if (declarator.IsNull)
             {
                 // No declarator field — scan children for qualified_identifier or operator_cast
-                for (uint i = 0; i < funcDefNode.child_count(); i++)
+                for (int i = 0; i < funcDefNode.Children.Count; i++)
                 {
-                    var child = funcDefNode.child(i);
-                    string childType = child.type();
+                    var child = funcDefNode.Children[i];
+                    string childType = child.Type;
                     if (childType == "qualified_identifier" || childType == "operator_cast")
-                        return (child.text(src), "");
+                        return (child.Text, "");
                 }
                 return ("<unknown>", "");
             }
 
             // Find the function_declarator (may be wrapped in pointer/reference declarators)
             var funcDecl = FindFunctionDeclaratorLocal(declarator);
-            if (funcDecl.is_null())
+            if (funcDecl.IsNull)
             {
                 // Not a function_declarator — just a name (e.g. function pointer variable)
-                return (TreeSitterCodeParser.ExtractDeclaratorName(declarator, src), "");
+                return (TreeSitterCodeParser.ExtractDeclaratorName(declarator), "");
             }
 
             // Extract name from the function_declarator's inner declarator
-            var innerDecl = funcDecl.child_by_field_name("declarator");
-            string name = !innerDecl.is_null()
-                ? TreeSitterCodeParser.ExtractDeclaratorName(innerDecl, src)
+            var innerDecl = funcDecl.ChildByFieldName("declarator");
+            string name = !innerDecl.IsNull
+                ? TreeSitterCodeParser.ExtractDeclaratorName(innerDecl)
                 : "<unknown>";
 
             // Extract params from the function_declarator's parameters
-            var parameters = funcDecl.child_by_field_name("parameters");
+            var parameters = funcDecl.ChildByFieldName("parameters");
             string paramList = "";
-            if (!parameters.is_null())
+            if (!parameters.IsNull)
             {
                 var paramNames = new List<string>();
-                for (uint i = 0; i < parameters.child_count(); i++)
+                for (int i = 0; i < parameters.Children.Count; i++)
                 {
-                    var param = parameters.child(i);
-                    string paramType = param.type();
+                    var param = parameters.Children[i];
+                    string paramType = param.Type;
                     if (paramType == "parameter_declaration" || paramType == "optional_parameter_declaration")
                     {
-                        var paramTypeNode = param.child_by_field_name("type");
-                        if (!paramTypeNode.is_null())
-                            paramNames.Add(paramTypeNode.text(src).Trim());
+                        var paramTypeNode = param.ChildByFieldName("type");
+                        if (!paramTypeNode.IsNull)
+                            paramNames.Add(paramTypeNode.Text.Trim());
                         else
-                            paramNames.Add(param.text(src).Trim());
+                            paramNames.Add(param.Text.Trim());
                     }
                     else if (paramType == "variadic_parameter_declaration")
                     {
@@ -494,47 +468,47 @@ namespace LevyFlight
             return (name, paramList);
         }
 
-        private static TSNode FindFunctionDeclaratorLocal(TSNode node)
+        private static SyntaxNode FindFunctionDeclaratorLocal(SyntaxNode node)
         {
-            if (node.is_null())
+            if (node.IsNull)
                 return node;
-            string type = node.type();
+            string type = node.Type;
             if (type == "function_declarator")
                 return node;
             if (type == "pointer_declarator" || type == "reference_declarator")
             {
-                var inner = node.child_by_field_name("declarator");
-                if (!inner.is_null())
+                var inner = node.ChildByFieldName("declarator");
+                if (!inner.IsNull)
                     return FindFunctionDeclaratorLocal(inner);
-                for (uint i = 0; i < node.child_count(); i++)
+                for (int i = 0; i < node.Children.Count; i++)
                 {
-                    var result = FindFunctionDeclaratorLocal(node.child(i));
-                    if (!result.is_null())
+                    var result = FindFunctionDeclaratorLocal(node.Children[i]);
+                    if (!result.IsNull)
                         return result;
                 }
             }
-            return new TSNode();
+            return SyntaxNode.Null;
         }
 
-        private static void HandleDeclaration(TSNode node, string src, IList<OutlineSymbolItem> siblings, AccessLevel access)
+        private static void HandleDeclaration(SyntaxNode node, IList<OutlineSymbolItem> siblings, AccessLevel access)
         {
             // A "declaration" can be a variable, a function prototype, or a forward decl.
             // We show only variable declarations and simple prototypes.
-            var declarator = node.child_by_field_name("declarator");
-            if (declarator.is_null()) return;
+            var declarator = node.ChildByFieldName("declarator");
+            if (declarator.IsNull) return;
 
-            string declType = declarator.type();
+            string declType = declarator.Type;
 
             // Function prototype — show it
             if (declType == "function_declarator")
             {
                 string returnType = "";
-                var typeNode = node.child_by_field_name("type");
-                if (!typeNode.is_null())
-                    returnType = typeNode.text(src).Trim();
+                var typeNode = node.ChildByFieldName("type");
+                if (!typeNode.IsNull)
+                    returnType = typeNode.Text.Trim();
 
-                string name = ExtractSimpleName(declarator, src);
-                string paramList = TreeSitterCodeParser.GetParameterList(node, src);
+                string name = ExtractSimpleName(declarator);
+                string paramList = TreeSitterCodeParser.GetParameterList(node);
                 string displayName = (!string.IsNullOrEmpty(returnType) ? returnType + " " : "")
                                      + name + "(" + paramList + ")";
                 var item = MakeItem(displayName, OutlineSymbolKind.Function, access, node);
@@ -547,11 +521,11 @@ namespace LevyFlight
                 || declType == "reference_declarator")
             {
                 string returnType = "";
-                var typeNode = node.child_by_field_name("type");
-                if (!typeNode.is_null())
-                    returnType = typeNode.text(src).Trim();
+                var typeNode = node.ChildByFieldName("type");
+                if (!typeNode.IsNull)
+                    returnType = typeNode.Text.Trim();
 
-                string name = ExtractSimpleName(declarator, src);
+                string name = ExtractSimpleName(declarator);
                 string displayName = (!string.IsNullOrEmpty(returnType) ? returnType + " " : "") + name;
                 var item = MakeItem(displayName, OutlineSymbolKind.Variable, access, node);
                 siblings.Add(item);
@@ -559,46 +533,46 @@ namespace LevyFlight
             }
         }
 
-        private static void HandleFieldDeclaration(TSNode node, string src, IList<OutlineSymbolItem> siblings, AccessLevel access)
+        private static void HandleFieldDeclaration(SyntaxNode node, IList<OutlineSymbolItem> siblings, AccessLevel access)
         {
             // A field_declaration has a type and one or more declarators.
             string returnType = "";
-            var typeNode = node.child_by_field_name("type");
-            if (!typeNode.is_null())
-                returnType = typeNode.text(src).Trim();
+            var typeNode = node.ChildByFieldName("type");
+            if (!typeNode.IsNull)
+                returnType = typeNode.Text.Trim();
 
-            var declarator = node.child_by_field_name("declarator");
+            var declarator = node.ChildByFieldName("declarator");
 
             // Some field_declaration nodes contain nested class/struct/union/enum definitions
             // For example: struct { int x; } myField;
             // In that case the type itself may be a class_specifier etc.
-            if (!typeNode.is_null())
+            if (!typeNode.IsNull)
             {
-                string typeType = typeNode.type();
+                string typeType = typeNode.Type;
                 if (typeType == "class_specifier" || typeType == "struct_specifier" || typeType == "union_specifier")
                 {
                     var kind = typeType == "class_specifier" ? OutlineSymbolKind.Class
                              : typeType == "struct_specifier" ? OutlineSymbolKind.Struct
                              : OutlineSymbolKind.Union;
-                    HandleClassOrStruct(typeNode, src, siblings, kind, access, false);
+                    HandleClassOrStruct(typeNode, siblings, kind, access, false);
                     // If there's also a declarator (named field), still add it
-                    if (declarator.is_null()) return;
+                    if (declarator.IsNull) return;
                 }
                 else if (typeType == "enum_specifier")
                 {
-                    HandleEnum(typeNode, src, siblings, access);
-                    if (declarator.is_null()) return;
+                    HandleEnum(typeNode, siblings, access);
+                    if (declarator.IsNull) return;
                 }
             }
 
-            if (declarator.is_null()) return;
+            if (declarator.IsNull) return;
 
             // Check if this is a function pointer or function declarator inside a field
-            string declType = declarator.type();
+            string declType = declarator.Type;
             if (declType == "function_declarator")
             {
-                string name = ExtractSimpleName(declarator, src);
-                string paramList = TreeSitterCodeParser.GetParameterList(node, src);
+                string name = ExtractSimpleName(declarator);
+                string paramList = TreeSitterCodeParser.GetParameterList(node);
                 string displayName = (!string.IsNullOrEmpty(returnType) ? returnType + " " : "")
                                      + name + "(" + paramList + ")";
                 var item = MakeItem(displayName, OutlineSymbolKind.Function, access, node);
@@ -606,86 +580,86 @@ namespace LevyFlight
                 return;
             }
 
-            string fieldName = ExtractSimpleName(declarator, src);
+            string fieldName = ExtractSimpleName(declarator);
             string display = (!string.IsNullOrEmpty(returnType) ? returnType + " " : "") + fieldName;
             var fieldItem = MakeItem(display, OutlineSymbolKind.Field, access, node);
             siblings.Add(fieldItem);
         }
 
-        private static void HandlePreprocDef(TSNode node, string src, IList<OutlineSymbolItem> siblings)
+        private static void HandlePreprocDef(SyntaxNode node, IList<OutlineSymbolItem> siblings)
         {
-            var nameNode = node.child_by_field_name("name");
-            if (nameNode.is_null()) return;
+            var nameNode = node.ChildByFieldName("name");
+            if (nameNode.IsNull) return;
 
-            string name = nameNode.text(src);
+            string name = nameNode.Text;
             var item = MakeItem(name, OutlineSymbolKind.Macro, AccessLevel.Public, node);
             siblings.Add(item);
         }
 
-        private static void HandlePreprocFunctionDef(TSNode node, string src, IList<OutlineSymbolItem> siblings)
+        private static void HandlePreprocFunctionDef(SyntaxNode node, IList<OutlineSymbolItem> siblings)
         {
-            var nameNode = node.child_by_field_name("name");
-            if (nameNode.is_null()) return;
+            var nameNode = node.ChildByFieldName("name");
+            if (nameNode.IsNull) return;
 
             // Build parameter list from the preproc parameters
-            string name = nameNode.text(src);
-            var parameters = node.child_by_field_name("parameters");
-            string paramText = !parameters.is_null() ? parameters.text(src) : "()";
+            string name = nameNode.Text;
+            var parameters = node.ChildByFieldName("parameters");
+            string paramText = !parameters.IsNull ? parameters.Text : "()";
             var item = MakeItem(name + paramText, OutlineSymbolKind.Macro, AccessLevel.Public, node);
             siblings.Add(item);
         }
 
-        private static void HandleTypeDefinition(TSNode node, string src, IList<OutlineSymbolItem> siblings, AccessLevel access)
+        private static void HandleTypeDefinition(SyntaxNode node, IList<OutlineSymbolItem> siblings, AccessLevel access)
         {
-            var declarator = node.child_by_field_name("declarator");
-            if (declarator.is_null()) return;
+            var declarator = node.ChildByFieldName("declarator");
+            if (declarator.IsNull) return;
 
-            string name = ExtractSimpleName(declarator, src);
+            string name = ExtractSimpleName(declarator);
             var item = MakeItem(name, OutlineSymbolKind.TypeDef, access, node);
             siblings.Add(item);
         }
 
-        private static void HandleAliasDeclaration(TSNode node, string src, IList<OutlineSymbolItem> siblings, AccessLevel access)
+        private static void HandleAliasDeclaration(SyntaxNode node, IList<OutlineSymbolItem> siblings, AccessLevel access)
         {
-            var nameNode = node.child_by_field_name("name");
-            if (nameNode.is_null()) return;
+            var nameNode = node.ChildByFieldName("name");
+            if (nameNode.IsNull) return;
 
-            string name = nameNode.text(src);
+            string name = nameNode.Text;
             var item = MakeItem(name, OutlineSymbolKind.UsingAlias, access, node);
             siblings.Add(item);
         }
 
-        private static void HandleTemplateDeclaration(TSNode node, string src, IList<OutlineSymbolItem> siblings, AccessLevel access, bool insideFunctionBody)
+        private static void HandleTemplateDeclaration(SyntaxNode node, IList<OutlineSymbolItem> siblings, AccessLevel access, bool insideFunctionBody)
         {
             // A template_declaration wraps another declaration — unwrap and process the inner node
-            uint count = node.child_count();
-            for (uint i = 0; i < count; i++)
+            int count = node.Children.Count;
+            for (int i = 0; i < count; i++)
             {
-                var child = node.child(i);
-                if (child.is_null()) continue;
-                string childType = child.type();
+                var child = node.Children[(int)i];
+                if (child.IsNull) continue;
+                string childType = child.Type;
 
                 switch (childType)
                 {
                     case "function_definition":
                         if (!insideFunctionBody)
-                            HandleFunction(child, src, siblings, access);
+                            HandleFunction(child, siblings, access);
                         break;
                     case "declaration":
                         if (!insideFunctionBody)
-                            HandleDeclaration(child, src, siblings, access);
+                            HandleDeclaration(child, siblings, access);
                         break;
                     case "class_specifier":
-                        HandleClassOrStruct(child, src, siblings, OutlineSymbolKind.Class, access, insideFunctionBody);
+                        HandleClassOrStruct(child, siblings, OutlineSymbolKind.Class, access, insideFunctionBody);
                         break;
                     case "struct_specifier":
-                        HandleClassOrStruct(child, src, siblings, OutlineSymbolKind.Struct, access, insideFunctionBody);
+                        HandleClassOrStruct(child, siblings, OutlineSymbolKind.Struct, access, insideFunctionBody);
                         break;
                     case "union_specifier":
-                        HandleClassOrStruct(child, src, siblings, OutlineSymbolKind.Union, access, insideFunctionBody);
+                        HandleClassOrStruct(child, siblings, OutlineSymbolKind.Union, access, insideFunctionBody);
                         break;
                     case "alias_declaration":
-                        HandleAliasDeclaration(child, src, siblings, access);
+                        HandleAliasDeclaration(child, siblings, access);
                         break;
                     // template_parameter_list — skip
                     default:
@@ -694,22 +668,22 @@ namespace LevyFlight
             }
         }
 
-        private static void HandleLinkageSpecification(TSNode node, string src, IList<OutlineSymbolItem> siblings, AccessLevel access, bool insideFunctionBody)
+        private static void HandleLinkageSpecification(SyntaxNode node, IList<OutlineSymbolItem> siblings, AccessLevel access, bool insideFunctionBody)
         {
             // extern "C" { ... } — recurse into the body
-            var body = node.child_by_field_name("body");
-            if (!body.is_null())
-                CollectSymbols(body, src, siblings, access, insideFunctionBody);
+            var body = node.ChildByFieldName("body");
+            if (!body.IsNull)
+                CollectSymbols(body, siblings, access, insideFunctionBody);
 
             // extern "C" single-declaration  (no body, the declaration is a direct child)
-            var value = node.child_by_field_name("value");
-            if (!value.is_null())
+            var value = node.ChildByFieldName("value");
+            if (!value.IsNull)
             {
-                string valType = value.type();
+                string valType = value.Type;
                 if (valType == "function_definition" && !insideFunctionBody)
-                    HandleFunction(value, src, siblings, access);
+                    HandleFunction(value, siblings, access);
                 else if (valType == "declaration" && !insideFunctionBody)
-                    HandleDeclaration(value, src, siblings, access);
+                    HandleDeclaration(value, siblings, access);
             }
         }
 
@@ -717,25 +691,25 @@ namespace LevyFlight
         //  Helpers
         // ────────────────────────────────────────────────────────────────────
 
-        private static AccessLevel ParseAccessSpecifier(TSNode node, string src)
+        private static AccessLevel ParseAccessSpecifier(SyntaxNode node)
         {
             // The node text is something like "public" or "private" or "protected"
             // (the colon is a separate child in some grammars)
-            string text = node.text(src).Trim().TrimEnd(':').Trim();
+            string text = node.Text.Trim().TrimEnd(':').Trim();
             if (text.StartsWith("private")) return AccessLevel.Private;
             if (text.StartsWith("protected")) return AccessLevel.Protected;
             return AccessLevel.Public;
         }
 
-        private static OutlineSymbolItem MakeItem(string name, OutlineSymbolKind kind, AccessLevel access, TSNode node)
+        private static OutlineSymbolItem MakeItem(string name, OutlineSymbolKind kind, AccessLevel access, SyntaxNode node)
         {
-            var start = node.start_point();
-            var end = node.end_point();
+            var start = node.Start;
+            var end = node.End;
             return new OutlineSymbolItem(name, kind, access)
             {
-                StartLine = (int)start.row + 1,
-                StartColumn = (int)start.column,
-                EndLine = (int)end.row + 1,
+                StartLine = (int)start.Row + 1,
+                StartColumn = (int)start.Column,
+                EndLine = (int)end.Row + 1,
             };
         }
 
@@ -743,68 +717,80 @@ namespace LevyFlight
         /// Extracts a simple, readable name from a declarator node.
         /// Handles init_declarator, pointer_declarator, reference_declarator, identifier, etc.
         /// </summary>
-        private static string ExtractSimpleName(TSNode declarator, string src)
+        private static string ExtractSimpleName(SyntaxNode declarator)
         {
-            if (declarator.is_null()) return "<unknown>";
+            if (declarator.IsNull) return "<unknown>";
 
-            string type = declarator.type();
+            string type = declarator.Type;
 
             if (type == "identifier" || type == "qualified_identifier"
                 || type == "destructor_name" || type == "operator_name")
             {
-                return declarator.text(src);
+                return declarator.Text;
             }
 
             if (type == "init_declarator")
             {
-                var inner = declarator.child_by_field_name("declarator");
-                if (!inner.is_null())
-                    return ExtractSimpleName(inner, src);
+                var inner = declarator.ChildByFieldName("declarator");
+                if (!inner.IsNull)
+                    return ExtractSimpleName(inner);
             }
 
             if (type == "pointer_declarator" || type == "reference_declarator")
             {
-                var inner = declarator.child_by_field_name("declarator");
-                if (!inner.is_null())
-                    return ExtractSimpleName(inner, src);
+                var inner = declarator.ChildByFieldName("declarator");
+                if (!inner.IsNull)
+                    return ExtractSimpleName(inner);
                 // Fall back to scanning children
-                for (uint i = 0; i < declarator.child_count(); i++)
+                for (int i = 0; i < declarator.Children.Count; i++)
                 {
-                    var child = declarator.child(i);
-                    string ct = child.type();
+                    var child = declarator.Children[(int)i];
+                    string ct = child.Type;
                     if (ct == "identifier" || ct == "qualified_identifier"
                         || ct == "function_declarator" || ct == "init_declarator")
-                        return ExtractSimpleName(child, src);
+                        return ExtractSimpleName(child);
                 }
             }
 
             if (type == "function_declarator")
             {
-                var inner = declarator.child_by_field_name("declarator");
-                if (!inner.is_null())
-                    return ExtractSimpleName(inner, src);
+                var inner = declarator.ChildByFieldName("declarator");
+                if (!inner.IsNull)
+                    return ExtractSimpleName(inner);
             }
 
             if (type == "array_declarator")
             {
-                var inner = declarator.child_by_field_name("declarator");
-                if (!inner.is_null())
-                    return ExtractSimpleName(inner, src);
+                var inner = declarator.ChildByFieldName("declarator");
+                if (!inner.IsNull)
+                    return ExtractSimpleName(inner);
             }
 
             if (type == "parenthesized_declarator")
             {
                 // (identifier) — unwrap
-                for (uint i = 0; i < declarator.child_count(); i++)
+                for (int i = 0; i < declarator.Children.Count; i++)
                 {
-                    var child = declarator.child(i);
-                    if (child.type() != "(" && child.type() != ")")
-                        return ExtractSimpleName(child, src);
+                    var child = declarator.Children[(int)i];
+                    if (child.Type != "(" && child.Type != ")")
+                        return ExtractSimpleName(child);
                 }
             }
 
             // Last resort
-            return declarator.text(src);
+            return declarator.Text;
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+

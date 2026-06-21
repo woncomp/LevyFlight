@@ -1,4 +1,4 @@
-using TreeSitterSharp;
+﻿using LevyFlight.TreeSitter;
 using Microsoft.VisualStudio.Imaging;
 using System;
 using System.Collections.Generic;
@@ -27,7 +27,7 @@ namespace LevyFlight
     ///    A macro call such as INDENT_SCOPE() { … } is parsed by tree-sitter as a
     ///    function_definition.  The key difference is that a real function has a "type" field
     ///    (its return type), while a macro-generated false positive does not.
-    ///    Always check: node.child_by_field_name("type").is_null() to filter these out.
+    ///    Always check: node.ChildByFieldName("type").is_null() to filter these out.
     ///
     /// 3. NESTED "FUNCTION DEFINITIONS" INSIDE FUNCTION BODIES
     ///    C++ does not allow nested function definitions, but tree-sitter can misparse
@@ -81,22 +81,12 @@ namespace LevyFlight
                 try
                 {
                     string sourceText = File.ReadAllText(filePath);
-                    using (var parser = new TSParser())
-                    using (var lang = TSParser.CppLanguage())
-                    {
-                        parser.set_language(lang);
-                        using (var tree = parser.parse_string(null, sourceText))
-                        {
-                            if (tree == null)
-                                return results;
+                    var tree = TreeSitterParser.Parse(sourceText);
+                    var root = tree.Root;
+                    var scopeStack = new List<string>();
+                    CollectFunctions(root, filePath, scopeStack, results);
 
-                            TreeSitterDiagnostics.SaveParse(filePath, sourceText, tree, "QuickOpen");
-
-                            var root = tree.root_node();
-                            var scopeStack = new List<string>();
-                            CollectFunctions(root, sourceText, filePath, scopeStack, results);
-                        }
-                    }
+                    TreeSitterDiagnostics.SaveParse(filePath, sourceText, tree, "QuickOpen", TreeSitterParser.CurrentEngineName);
                 }
                 catch (Exception ex)
                 {
@@ -106,16 +96,16 @@ namespace LevyFlight
             });
         }
 
-        private static void CollectFunctions(TSNode node, string sourceText, string filePath, List<string> scopeStack, List<JumpItem> results, bool insideFunction = false, string currentClassName = null)
+        private static void CollectFunctions(SyntaxNode node, string filePath, List<string> scopeStack, List<JumpItem> results, bool insideFunction = false, string currentClassName = null)
         {
-            string nodeType = node.type();
+            string nodeType = node.Type;
 
             // Track enclosing scopes: namespace, class, struct
             bool pushedScope = false;
             if (nodeType == "namespace_definition" || nodeType == "class_specifier" || nodeType == "struct_specifier")
             {
-                var nameNode = node.child_by_field_name("name");
-                string scopeName = !nameNode.is_null() ? nameNode.text(sourceText) : "<anonymous>";
+                var nameNode = node.ChildByFieldName("name");
+                string scopeName = !nameNode.IsNull ? nameNode.Text : "<anonymous>";
                 scopeStack.Add(scopeName);
                 pushedScope = true;
 
@@ -136,16 +126,16 @@ namespace LevyFlight
                     goto recurse;
 
                 // Check if this function has a return type
-                var typeNode = node.child_by_field_name("type");
+                var typeNode = node.ChildByFieldName("type");
 
                 // If no type field, check if it's a special member function (constructor/destructor/operator)
-                if (typeNode.is_null())
+                if (typeNode.IsNull)
                 {
-                    if (!IsSpecialMemberFunction(node, sourceText, currentClassName))
+                    if (!IsSpecialMemberFunction(node, currentClassName))
                         goto recurse;
                 }
 
-                string funcName = GetFunctionName(node, sourceText);
+                string funcName = GetFunctionName(node);
 
                 // If the declarator already has a qualified name (contains "::"), use it as-is.
                 // Otherwise, prepend the enclosing scope stack.
@@ -155,14 +145,14 @@ namespace LevyFlight
                 }
 
                 // Build display name: "returnType funcName(param1, param2)"
-                string returnType = GetReturnType(node, sourceText);
-                string paramList = GetParameterList(node, sourceText);
+                string returnType = GetReturnType(node);
+                string paramList = GetParameterList(node);
                 string displayName = (!string.IsNullOrEmpty(returnType) ? returnType + " " : "") + funcName + "(" + paramList + ")";
 
-                var start = node.start_point();
+                var start = node.Start;
                 var jumpItem = new JumpItem(Category.TreeSitter, filePath);
                 jumpItem.Name = displayName;
-                jumpItem.SetPosition((int)start.row + 1, (int)start.column);
+                jumpItem.SetPosition((int)start.Row + 1, (int)start.Column);
                 jumpItem.IconMoniker = KnownMonikers.MethodPublic;
                 results.Add(jumpItem);
                 insideFunction = true;
@@ -171,24 +161,24 @@ namespace LevyFlight
             // Function declarations (prototypes) — e.g. "void foo(int);" at namespace/class scope
             if (nodeType == "declaration" && !insideFunction)
             {
-                var declarator = node.child_by_field_name("declarator");
-                if (!declarator.is_null() && declarator.type() == "function_declarator")
+                var declarator = node.ChildByFieldName("declarator");
+                if (!declarator.IsNull && declarator.Type == "function_declarator")
                 {
-                    string returnType = GetReturnType(node, sourceText);
-                    string funcName = ExtractDeclaratorName(declarator, sourceText);
+                    string returnType = GetReturnType(node);
+                    string funcName = ExtractDeclaratorName(declarator);
 
                     if (!funcName.Contains("::") && scopeStack.Count > 0)
                     {
                         funcName = string.Join("::", scopeStack) + "::" + funcName;
                     }
 
-                    string paramList = GetParameterList(node, sourceText);
+                    string paramList = GetParameterList(node);
                     string displayName = (!string.IsNullOrEmpty(returnType) ? returnType + " " : "") + funcName + "(" + paramList + ")";
 
-                    var start = node.start_point();
+                    var start = node.Start;
                     var jumpItem = new JumpItem(Category.TreeSitter, filePath);
                     jumpItem.Name = displayName;
-                    jumpItem.SetPosition((int)start.row + 1, (int)start.column);
+                    jumpItem.SetPosition((int)start.Row + 1, (int)start.Column);
                     jumpItem.IconMoniker = KnownMonikers.Procedure;
                     jumpItem.IsDeclaration = true;
                     results.Add(jumpItem);
@@ -196,10 +186,10 @@ namespace LevyFlight
             }
 
             recurse:
-            uint childCount = node.child_count();
-            for (uint i = 0; i < childCount; i++)
+            int childCount = node.Children.Count;
+            for (int i = 0; i < childCount; i++)
             {
-                CollectFunctions(node.child(i), sourceText, filePath, scopeStack, results, insideFunction, currentClassName);
+                CollectFunctions(node.Children[i], filePath, scopeStack, results, insideFunction, currentClassName);
             }
 
             if (pushedScope)
@@ -208,28 +198,28 @@ namespace LevyFlight
             }
         }
 
-        internal static bool IsSpecialMemberFunction(TSNode funcDefNode, string sourceText, string className)
+        internal static bool IsSpecialMemberFunction(SyntaxNode funcDefNode, string className)
         {
             // Check the declarator field first
-            var declarator = funcDefNode.child_by_field_name("declarator");
+            var declarator = funcDefNode.ChildByFieldName("declarator");
 
             // If no declarator field, scan direct children for qualified_identifier or operator_cast
             // This handles out-of-class operator definitions like:
             //   internal::IndentScope::operator bool() const { ... }
             // where tree-sitter puts the whole thing into a qualified_identifier with no declarator.
-            if (declarator.is_null())
+            if (declarator.IsNull)
             {
-                for (uint i = 0; i < funcDefNode.child_count(); i++)
+                for (int i = 0; i < funcDefNode.Children.Count; i++)
                 {
-                    var child = funcDefNode.child(i);
-                    string childType = child.type();
+                    var child = funcDefNode.Children[i];
+                    string childType = child.Type;
 
                     if (childType == "operator_cast")
                         return true;
 
                     if (childType == "qualified_identifier")
                     {
-                        string text = child.text(sourceText);
+                        string text = child.Text;
                         if (text.Contains("operator"))
                             return true;
 
@@ -251,7 +241,7 @@ namespace LevyFlight
                 return false;
             }
 
-            string declType = declarator.type();
+            string declType = declarator.Type;
 
             // Operator overloads: operator_cast
             if (declType == "operator_cast")
@@ -260,7 +250,7 @@ namespace LevyFlight
             // qualified_identifier as declarator (e.g., internal::IndentScope::operator bool)
             if (declType == "qualified_identifier")
             {
-                string text = declarator.text(sourceText);
+                string text = declarator.Text;
                 if (text.Contains("operator"))
                     return true;
 
@@ -281,10 +271,10 @@ namespace LevyFlight
             // For function_declarator, check the inner declarator
             if (declType == "function_declarator")
             {
-                var inner = declarator.child_by_field_name("declarator");
-                if (!inner.is_null())
+                var inner = declarator.ChildByFieldName("declarator");
+                if (!inner.IsNull)
                 {
-                    string innerType = inner.type();
+                    string innerType = inner.Type;
 
                     // Destructor: destructor_name
                     if (innerType == "destructor_name")
@@ -297,7 +287,7 @@ namespace LevyFlight
                     // Constructor: identifier matching class name (in-class definition)
                     if (innerType == "identifier" && className != null)
                     {
-                        string name = inner.text(sourceText);
+                        string name = inner.Text;
                         if (name == className)
                             return true;
                     }
@@ -306,7 +296,7 @@ namespace LevyFlight
                     // e.g., ClassName::ClassName or ClassName::~ClassName
                     if (innerType == "qualified_identifier")
                     {
-                        string qualifiedName = inner.text(sourceText);
+                        string qualifiedName = inner.Text;
 
                         // Operator overload: contains "operator"
                         // e.g., "ClassName::operator==" or "ClassName::operator bool"
@@ -342,11 +332,11 @@ namespace LevyFlight
         /// Extracts the return type text from a function_definition node.
         /// Returns empty string for constructors/destructors (no return type).
         /// </summary>
-        internal static string GetReturnType(TSNode funcDefNode, string sourceText)
+        internal static string GetReturnType(SyntaxNode funcDefNode)
         {
-            var typeNode = funcDefNode.child_by_field_name("type");
-            if (!typeNode.is_null())
-                return typeNode.text(sourceText).Trim();
+            var typeNode = funcDefNode.ChildByFieldName("type");
+            if (!typeNode.IsNull)
+                return typeNode.Text.Trim();
             return "";
         }
 
@@ -354,43 +344,43 @@ namespace LevyFlight
         /// Extracts a comma-separated list of parameter type names from a function_definition.
         /// Drills into the declarator to find the parameter_list.
         /// </summary>
-        internal static string GetParameterList(TSNode funcDefNode, string sourceText)
+        internal static string GetParameterList(SyntaxNode funcDefNode)
         {
             // Find the function_declarator (may be wrapped in pointer/reference declarators)
-            var declarator = funcDefNode.child_by_field_name("declarator");
+            var declarator = funcDefNode.ChildByFieldName("declarator");
             var funcDecl = FindFunctionDeclarator(declarator);
-            if (funcDecl.is_null())
+            if (funcDecl.IsNull)
             {
                 // Some out-of-class definitions have no declarator field;
                 // scan direct children for a function_declarator
-                for (uint i = 0; i < funcDefNode.child_count(); i++)
+                for (int i = 0; i < funcDefNode.Children.Count; i++)
                 {
-                    var child = funcDefNode.child(i);
+                    var child = funcDefNode.Children[i];
                     funcDecl = FindFunctionDeclarator(child);
-                    if (!funcDecl.is_null())
+                    if (!funcDecl.IsNull)
                         break;
                 }
             }
-            if (funcDecl.is_null())
+            if (funcDecl.IsNull)
                 return "";
 
-            var parameters = funcDecl.child_by_field_name("parameters");
-            if (parameters.is_null())
+            var parameters = funcDecl.ChildByFieldName("parameters");
+            if (parameters.IsNull)
                 return "";
 
             var paramNames = new List<string>();
-            for (uint i = 0; i < parameters.child_count(); i++)
+            for (int i = 0; i < parameters.Children.Count; i++)
             {
-                var param = parameters.child(i);
-                string paramType = param.type();
+                var param = parameters.Children[i];
+                string paramType = param.Type;
 
                 if (paramType == "parameter_declaration" || paramType == "optional_parameter_declaration")
                 {
-                    var paramTypeNode = param.child_by_field_name("type");
-                    if (!paramTypeNode.is_null())
-                        paramNames.Add(paramTypeNode.text(sourceText).Trim());
+                    var paramTypeNode = param.ChildByFieldName("type");
+                    if (!paramTypeNode.IsNull)
+                        paramNames.Add(paramTypeNode.Text.Trim());
                     else
-                        paramNames.Add(param.text(sourceText).Trim());
+                        paramNames.Add(param.Text.Trim());
                 }
                 else if (paramType == "variadic_parameter_declaration")
                 {
@@ -403,66 +393,66 @@ namespace LevyFlight
         /// <summary>
         /// Recursively unwraps pointer/reference declarators to find the function_declarator node.
         /// </summary>
-        private static TSNode FindFunctionDeclarator(TSNode node)
+        private static SyntaxNode FindFunctionDeclarator(SyntaxNode node)
         {
-            if (node.is_null())
+            if (node.IsNull)
                 return node;
-            string type = node.type();
+            string type = node.Type;
             if (type == "function_declarator")
                 return node;
             if (type == "pointer_declarator" || type == "reference_declarator")
             {
-                var inner = node.child_by_field_name("declarator");
-                if (!inner.is_null())
+                var inner = node.ChildByFieldName("declarator");
+                if (!inner.IsNull)
                     return FindFunctionDeclarator(inner);
                 // Field lookup failed — scan children
-                for (uint i = 0; i < node.child_count(); i++)
+                for (int i = 0; i < node.Children.Count; i++)
                 {
-                    var result = FindFunctionDeclarator(node.child(i));
-                    if (!result.is_null())
+                    var result = FindFunctionDeclarator(node.Children[i]);
+                    if (!result.IsNull)
                         return result;
                 }
             }
-            return new TSNode(); // null node
+            return SyntaxNode.Null;
         }
 
-        internal static string GetFunctionName(TSNode funcDefNode, string sourceText)
+        internal static string GetFunctionName(SyntaxNode funcDefNode)
         {
             // The "declarator" field of a function_definition holds the function declarator
-            var declarator = funcDefNode.child_by_field_name("declarator");
-            if (!declarator.is_null())
+            var declarator = funcDefNode.ChildByFieldName("declarator");
+            if (!declarator.IsNull)
             {
                 // Drill into nested declarators (e.g. pointer_declarator, reference_declarator)
                 // until we find the actual name or qualified_identifier
-                return ExtractDeclaratorName(declarator, sourceText);
+                return ExtractDeclaratorName(declarator);
             }
 
             // No declarator field — scan children for qualified_identifier or operator_cast
             // This handles out-of-class operators where tree-sitter puts everything into
             // a qualified_identifier as a direct child of function_definition
-            for (uint i = 0; i < funcDefNode.child_count(); i++)
-            {
-                var child = funcDefNode.child(i);
-                string childType = child.type();
+                for (int i = 0; i < funcDefNode.Children.Count; i++)
+                {
+                    var child = funcDefNode.Children[i];
+                string childType = child.Type;
                 if (childType == "qualified_identifier" || childType == "operator_cast")
                 {
-                    return child.text(sourceText);
+                    return child.Text;
                 }
             }
 
             return "<unknown>";
         }
 
-        internal static string ExtractDeclaratorName(TSNode declarator, string sourceText)
+        internal static string ExtractDeclaratorName(SyntaxNode declarator)
         {
-            string type = declarator.type();
+            string type = declarator.Type;
 
             // function_declarator -> look at the "declarator" field for the name
             if (type == "function_declarator")
             {
-                var inner = declarator.child_by_field_name("declarator");
-                if (!inner.is_null())
-                    return ExtractDeclaratorName(inner, sourceText);
+                var inner = declarator.ChildByFieldName("declarator");
+                if (!inner.IsNull)
+                    return ExtractDeclaratorName(inner);
             }
 
             // pointer_declarator, reference_declarator -> unwrap
@@ -470,53 +460,59 @@ namespace LevyFlight
             // searching children for a recognizable declarator node type.
             if (type == "pointer_declarator" || type == "reference_declarator")
             {
-                var inner = declarator.child_by_field_name("declarator");
-                if (!inner.is_null())
-                    return ExtractDeclaratorName(inner, sourceText);
+                var inner = declarator.ChildByFieldName("declarator");
+                if (!inner.IsNull)
+                    return ExtractDeclaratorName(inner);
 
                 // Field lookup failed — scan children for the nested declarator
-                for (uint i = 0; i < declarator.child_count(); i++)
+                for (int i = 0; i < declarator.Children.Count; i++)
                 {
-                    var child = declarator.child(i);
-                    string childType = child.type();
+                    var child = declarator.Children[i];
+                    string childType = child.Type;
                     if (childType == "function_declarator" || childType == "pointer_declarator"
                         || childType == "reference_declarator" || childType == "identifier"
                         || childType == "qualified_identifier" || childType == "destructor_name"
                         || childType == "template_function" || childType == "operator_name"
                         || childType == "parenthesized_declarator")
                     {
-                        return ExtractDeclaratorName(child, sourceText);
+                        return ExtractDeclaratorName(child);
                     }
                 }
             }
 
             // For identifiers, qualified_identifier, destructor_name, template_function, operator_name etc.
             // just return the source text of the node
-            return declarator.text(sourceText);
+            return declarator.Text;
         }
 
-        public static void PrintTree(TSNode node, string sourceText, int depth)
+        public static void PrintTree(SyntaxNode node, int depth)
         {
             string indent = new string(' ', depth * 2);
-            string nodeType = node.type();
+            string nodeType = node.Type;
 
             // For small nodes, show the text content
             string content = "";
-            if (node.end_offset() - node.start_offset() < 40)
+            if (node.Text.Length < 40)
             {
-                content = node.text(sourceText).Replace("\n", "\\n").Replace("\r", "");
+                content = node.Text.Replace("\n", "\\n").Replace("\r", "");
                 if (content.Length > 40) content = content.Substring(0, 37) + "...";
                 content = $" \"{content}\"";
             }
 
-            var start = node.start_point();
-            Debug.WriteLine($"{indent}{nodeType}  (line {start.row + 1}){content}");
+            var start = node.Start;
+            Debug.WriteLine($"{indent}{nodeType}  (line {start.Row + 1}){content}");
 
-            uint childCount = node.child_count();
-            for (uint i = 0; i < childCount; i++)
+            int childCount = node.Children.Count;
+            for (int i = 0; i < childCount; i++)
             {
-                PrintTree(node.child(i), sourceText, depth + 1);
+                PrintTree(node.Children[i], depth + 1);
             }
         }
     }
 }
+
+
+
+
+
+
