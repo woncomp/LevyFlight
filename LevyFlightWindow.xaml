@@ -3,145 +3,39 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:LevyFlight"
-             xmlns:ae="http://icsharpcode.net/sharpdevelop/avalonedit"
-             xmlns:imaging="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.Imaging"
-             xmlns:platformUI="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
              xmlns:shell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
              mc:Ignorable="d" Title="Levy Flight" ShowInTaskbar="False"
              d:DesignHeight="450" d:DesignWidth="800"
              Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
              Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"
-             KeyDown="Window_KeyDown" PreviewKeyDown="Window_PreviewKeyDown" Loaded="Window_Loaded" SourceInitialized="Window_SourceInitialized" Closing="Window_Closing">
-    <Grid Margin="2">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-        <Grid Grid.Row="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="50*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <TextBox Name="txtFilter" PreviewKeyDown="txtFilter_KeyDown" TextChanged="txtFilter_TextChanged"
-                     Background="{DynamicResource {x:Static shell:VsBrushes.WindowKey}}"
-                     Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
-            <StackPanel Orientation="Horizontal" Grid.Column="1">
-                <StackPanel.Resources>
-                    <Style TargetType="{x:Type Button}">
-                        <Setter Property="Margin" Value="2,0,0,0"/>
-                        <Setter Property="Background" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarMouseOverBackgroundBeginBrushKey}}"/>
-                        <Setter Property="Foreground" Value="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
-                    </Style>
-                    <Style TargetType="{x:Type Label}">
-                        <Setter Property="Foreground" Value="{DynamicResource {x:Static shell:VsBrushes.GrayTextKey}}"/>
-                    </Style>
-                </StackPanel.Resources>
-                <Label>|</Label>
-                <Button>All In One</Button>
-                <Button>Files</Button>
-                <Button>Bookmarks</Button>
-                <Button>Edits</Button>
-                <Label>|</Label>
-                <Button Click="SettingsButton_Click">Settings</Button>
+             Loaded="Window_Loaded" SourceInitialized="Window_SourceInitialized" Closing="Window_Closing">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </Window.Resources>
+    
+    <Grid>
+        <!-- Host for the real quick-open UI, loaded lazily -->
+        <ContentPresenter x:Name="contentHost" />
+
+        <!-- Loading overlay -->
+        <Grid Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
+               Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"
+               Panel.ZIndex="1000">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="120" Height="4" Margin="0,0,0,8"/>
+                <TextBlock Text="Loading..." HorizontalAlignment="Center" FontSize="12"
+                           Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
             </StackPanel>
         </Grid>
-        <Border Grid.Row="1" Padding="2,2,2,2" BorderThickness="2,2,2,2" CornerRadius="2,2,2,2"
-                BorderBrush="{DynamicResource {x:Static platformUI:EnvironmentColors.ToolWindowBorderBrushKey}}">
-            <Grid Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="45*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="55*"/>
-                </Grid.ColumnDefinitions>
-                <ListBox Name="lstFiles" ItemsSource="{Binding Path=ViewSource.View}" SelectionChanged="lstFiles_SelectionChanged" MouseDoubleClick="lstFiles_MouseDoubleClick" AlternationCount="1000"
-                         Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
-                         Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}">
-                    <ListBox.Resources>
-                        <local:QuickOpenKeyLabelConverter x:Key="QuickOpenKeyLabelConverter" />
-                        <local:AlternationIndexToBrushConverter x:Key="AlternationIndexToBrushConverter" />
-                    </ListBox.Resources>
-                    <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            <Setter Property="Padding" Value="2,1"/>
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ListBoxItem">
-                                        <Border x:Name="Bd"
-                                                Background="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=(ItemsControl.AlternationIndex), Converter={StaticResource AlternationIndexToBrushConverter}}"
-                                                Padding="{TemplateBinding Padding}"
-                                                SnapsToDevicePixels="True">
-                                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <!-- Hover: gray background -->
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="#40808080"/>
-                                            </Trigger>
-                                            <!-- Selected: emerald green (overrides hover) -->
-                                            <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="#2E8B57"/>
-                                                <Setter Property="Foreground" Value="White"/>
-                                                <Setter Property="FontWeight" Value="Bold"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </ListBox.ItemContainerStyle>
-                    <ListBox.ItemTemplate>
-                        <DataTemplate DataType="{x:Type local:JumpItem}">
-                            <DockPanel LastChildFill="True">
-                                <!-- Hotkey hint: bound to QuickOpenIndex instead of AlternationIndex -->
-                                <TextBlock Text="{Binding QuickOpenIndex, Converter={StaticResource QuickOpenKeyLabelConverter}}"
-                                           Width="16" FontWeight="Bold" TextAlignment="Center"
-                                           Foreground="{DynamicResource {x:Static shell:VsBrushes.GrayTextKey}}"
-                                           DockPanel.Dock="Left"/>
-                                <!-- Icon -->
-                                <imaging:CrispImage Width="16" Height="16"
-                                                    Moniker="{Binding IconMoniker}"
-                                                    Margin="2,0,4,0"
-                                                    DockPanel.Dock="Left"/>
-                                <!-- Score: docked right -->
-                                <TextBlock Text="{Binding Score}" Width="40" TextAlignment="Right"
-                                           Foreground="{DynamicResource {x:Static shell:VsBrushes.GrayTextKey}}"
-                                           Margin="4,0,4,0"
-                                           DockPanel.Dock="Right"/>
-                                <!-- Display name: fills remaining space -->
-                                <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
-                            </DockPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-                <GridSplitter Grid.Column="1" Width="4"
-                              HorizontalAlignment="Center" VerticalAlignment="Stretch"
-                              ResizeBehavior="PreviousAndNext"
-                              Background="{DynamicResource {x:Static platformUI:EnvironmentColors.ToolWindowBorderBrushKey}}"/>
-                <Grid Grid.Column="2">
-                    <ae:TextEditor Name="codePreview"
-                                   IsReadOnly="True"
-                                   ShowLineNumbers="True"
-                                   FontFamily="Consolas"
-                                   Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
-                                   Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
-                    <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4"
-                            Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
-                            BorderBrush="{DynamicResource {x:Static platformUI:EnvironmentColors.ToolWindowBorderBrushKey}}"
-                            BorderThickness="1" CornerRadius="2" Padding="6,4" Opacity="0.95"
-                            IsHitTestVisible="False"
-                            Visibility="{Binding DiagnosticOverlayVisibility}">
-                        <TextBlock Text="{Binding Path=DebugString}" FontFamily="Cascadia Mono" FontSize="10"
-                                   Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
-                    </Border>
-                </Grid>
-            </Grid>
-        </Border>
-        <TextBlock Grid.Row="2" Text="{Binding Path=SelectedItemFullPath}"
-                   Foreground="{DynamicResource {x:Static shell:VsBrushes.GrayTextKey}}"/>
+
+        <!-- Error overlay -->
+        <Grid Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
+               Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}"
+               Panel.ZIndex="1001">
+            <TextBlock Text="{Binding ErrorMessage}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       FontSize="12"
+                       Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
+        </Grid>
     </Grid>
 </Window>

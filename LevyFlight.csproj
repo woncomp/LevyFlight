@@ -56,6 +56,9 @@
     <Compile Include="LevyFlightSettingsWindow.xaml.cs">
       <DependentUpon>LevyFlightSettingsWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="LevyFlightQuickOpenControl.xaml.cs">
+      <DependentUpon>LevyFlightQuickOpenControl.xaml</DependentUpon>
+    </Compile>
     <Compile Include="LevyFlightWindow.xaml.cs">
       <DependentUpon>LevyFlightWindow.xaml</DependentUpon>
     </Compile>
@@ -109,6 +112,10 @@
     <Content Include="Resources\LevyFlightWindowCommand.png" />
   </ItemGroup>
   <ItemGroup>
+    <Page Include="LevyFlightQuickOpenControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>XamlIntelliSenseFileGenerator</Generator>
+    </Page>
     <Page Include="LevyFlightWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>XamlIntelliSenseFileGenerator</Generator>

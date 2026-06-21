@@ -19,9 +19,9 @@ namespace LevyFlight
             if (value is int qIdx && qIdx >= 1) // index 0 = first item, no hotkey
             {
                 int keyIdx = qIdx - 1; // map 1 -> QuickOpenKeys[0]
-                if (keyIdx < LevyFlightWindow.QuickOpenKeys.Length)
+                if (keyIdx < LevyFlightQuickOpenControl.QuickOpenKeys.Length)
                 {
-                    var key = LevyFlightWindow.QuickOpenKeys[keyIdx];
+                    var key = LevyFlightQuickOpenControl.QuickOpenKeys[keyIdx];
                     if (key >= Key.D0 && key <= Key.D9)
                     {
                         return ((char)('0' + (key - Key.D0))).ToString();
