@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="16" height="16" viewBox="0 0 16 16"
+     shape-rendering="geometricPrecision">
+  <!--
+    LevyFlight brand icon — a literal "Levy flight" trace.
+
+    One continuous polyline (one pen-up micro-jump) walks the Levy
+    signature: long straight jumps (heavy-tailed steps) linked by
+    short local zigzags at the landing clusters. The trace depicts a
+    capital "L" crossed by a lowercase "f":
+
+      * L's spine  — left vertical, top to the shared horizontal.
+      * shared horizontal — ONE line serving as BOTH the L's foot and
+        the f's crossbar ("shared crossbar").
+      * f's spine  — right vertical, passing BEHIND the shared
+        horizontal: it is gapped at the crossing so the horizontal
+        reads as the unbroken, in-front stroke.
+      * f's top terminal, mid crossbar and lower-left tail complete
+        the f.
+
+    Trajectory: L-spine (long, with subtle Levy jitter) -> shared
+    horizontal (long, = L foot / f crossbar) -> long flight up the
+    right edge to the f's hook -> f hook (local) -> f spine down to
+    the gap -> [pen up, behind] -> f spine resumes -> f tail (local
+    zigzags).
+
+    Local steps are kept small (<=0.3u) so the letterforms stay
+    legible at 16px while still reading as Levy wanderings.
+    Palette matches the existing toolbar icon (#424242) on a
+    transparent field.
+  -->
+
+  <path fill="none" stroke="#424242" stroke-width="1"
+        stroke-linecap="round" stroke-linejoin="round"
+        d="
+          M 4.2 2.4
+          L 4.0 3.0 L 4.3 3.6
+          L 4.1 5.4
+          L 4.4 6.0 L 4.0 6.6
+          L 4.2 10.4
+          L 12.4 10.4
+          L 12.6 3.4
+          L 12.3 3.0 L 12.5 2.7
+          L 11.2 3.4
+          L 10.8 3.1 L 11.2 3.5
+          L 10.9 9.8
+          M 10.9 11.0
+          L 11.1 11.6 L 10.8 12.2
+          L 10.9 13.4
+          L 10.3 13.7 L 9.4 14.0 L 8.4 13.9 L 7.4 14.2 L 6.4 14.1
+        "/>
+</svg>

@@ -123,7 +123,16 @@
     <VSCTCompile Include="LevyFlightPackage.vsct">
       <ResourceName>Menus.ctmenu</ResourceName>
     </VSCTCompile>
+    <Content Include="Resources\BookmarkMenuIcon.png" />
+    <Content Include="Resources\LevyFlightBrandIcon.png" />
     <Content Include="Resources\LevyFlightWindowCommand.png" />
+    <!-- VS Image Service: vector icon sources embedded as WPF resources,
+         referenced by LevyFlightImageManifest.imagemanifest via pack URI. -->
+    <Resource Include="Resources\LevyFlightBrandIcon.xaml" />
+    <Resource Include="Resources\BookmarkMenuIcon.xaml" />
+    <Content Include="Resources\LevyFlightImageManifest.imagemanifest">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <Page Include="LevyFlightQuickOpenControl.xaml">

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- LevyFlight bookmark icon — VS Image Service vector source (XAML).
+     Redrawn from Resources/BookmarkMenuIcon.png: a ribbon bookmark with
+     a flat top and a V-notch tail. Three concentric shapes give the
+     beveled look: dark-green outer frame (#13773B), mid-green bevel
+     (#32A05A), bright-green fill (#50C878). Geometry sits in a 16x16
+     footprint; no Width/Height on the Canvas so the Image Service can
+     rasterize at any DPI. -->
+<Canvas xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Outer frame (dark green). Full bookmark outline: top-left across the
+       top, down the right, in to the notch point, back out up the left. -->
+  <Path Fill="#13773B"
+        Data="M 2 1.5 L 11 1.5 L 11 14.2 L 6.5 10.5 L 2 14.2 Z" />
+
+  <!-- Mid-green bevel, inset 0.6 from the frame. -->
+  <Path Fill="#32A05A"
+        Data="M 2.6 2.1 L 10.4 2.1 L 10.4 12.9 L 6.5 9.6 L 2.6 12.9 Z" />
+
+  <!-- Bright-green fill, inset again for the inner face. -->
+  <Path Fill="#50C878"
+        Data="M 3.2 2.7 L 9.8 2.7 L 9.8 11.6 L 6.5 8.7 L 3.2 11.6 Z" />
+
+  <!-- Soft shade along the V-notch (darker green) to echo the PNG's shadow. -->
+  <Path Fill="#157A3A"
+        Data="M 5.3 10.6 L 6.5 9.4 L 7.7 10.6 L 6.5 11.7 Z" />
+</Canvas>

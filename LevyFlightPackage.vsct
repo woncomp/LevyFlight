@@ -71,7 +71,7 @@
           If you do not want an image next to your command, remove the Icon node /> -->
       <Button guid="guidLevyFlightPackageCmdSet" id="LevyFlightWindowCommandId" priority="0x0100" type="Button">
         <Parent guid="guidLevyFlightPackageCmdSet" id="MyMenuGroup" />
-        <Icon guid="guidImages" id="bmpPic1" />
+        <Icon guid="guidBrandIcon" id="bmpBrandIcon" />
         <Strings>
           <ButtonText>Levy Flight Window</ButtonText>
         </Strings>
@@ -86,7 +86,7 @@
       
       <Button guid="guidLevyFlightPackageCmdSet" id="LevyFlightToggleBookmarkCommandId" priority="0x0110" type="Button">
         <Parent guid="guidLevyFlightPackageCmdSet" id="MyMenuGroup" />
-        <Icon guid="guidImages" id="bmpPic2" />
+        <Icon guid="guidBookmarkMenuIcon" id="bmpBookmarkIcon" />
         <Strings>
           <ButtonText>Toggle LevyFlight Bookmark</ButtonText>
         </Strings>
@@ -150,6 +150,8 @@
             inside a button definition. An important aspect of this declaration is that the element id
             must be the actual index (1-based) of the bitmap inside the bitmap strip. -->
       <Bitmap guid="guidImages" href="Resources\LevyFlightWindowCommand.png" usedList="bmpPic1, bmpPic2, bmpPicSearch, bmpPicX, bmpPicArrows, bmpPicStrikethrough"/>
+      <Bitmap guid="guidBookmarkMenuIcon" href="Resources\BookmarkMenuIcon.png" usedList="bmpBookmarkIcon"/>
+      <Bitmap guid="guidBrandIcon" href="Resources\LevyFlightBrandIcon.png" usedList="bmpBrandIcon"/>
     </Bitmaps>
   </Commands>
 
@@ -196,6 +198,12 @@
       <IDSymbol name="bmpPicX" value="4" />
       <IDSymbol name="bmpPicArrows" value="5" />
       <IDSymbol name="bmpPicStrikethrough" value="6" />
+    </GuidSymbol>
+    <GuidSymbol name="guidBookmarkMenuIcon" value="{a1b2c3d4-e5f6-7890-abcd-ef1234567890}">
+      <IDSymbol name="bmpBookmarkIcon" value="1" />
+    </GuidSymbol>
+    <GuidSymbol name="guidBrandIcon" value="{b2c3d4e5-f6a7-8901-bcde-f23456789012}">
+      <IDSymbol name="bmpBrandIcon" value="1" />
     </GuidSymbol>
     <GuidSymbol name="guidVSStdEditorText" value="{8B382828-6202-11d1-8870-0000F87579D2}" />
   </Symbols>

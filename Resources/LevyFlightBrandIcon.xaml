@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- LevyFlight brand icon — VS Image Service vector source (XAML).
+     Derived from docs/LevyFlightBrandIcon.svg. The SVG path mini-language
+     is identical to WPF Path.Data, so the geometry carries over verbatim.
+     Canvas root with no Width/Height: the geometry defines the 16x16
+     footprint, letting the Image Service rasterize at any DPI. -->
+<Canvas xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Path Fill="{x:Null}"
+        Stroke="#424242"
+        StrokeThickness="1"
+        StrokeStartLineCap="Round"
+        StrokeEndLineCap="Round"
+        StrokeLineJoin="Round"
+        Data="M 4.2 2.4 L 4.0 3.0 L 4.3 3.6 L 4.1 5.4 L 4.4 6.0 L 4.0 6.6 L 4.2 10.4 L 12.4 10.4 L 12.6 3.4 L 12.3 3.0 L 12.5 2.7 L 11.2 3.4 L 10.8 3.1 L 11.2 3.5 L 10.9 9.8 M 10.9 11.0 L 11.1 11.6 L 10.8 12.2 L 10.9 13.4 L 10.3 13.7 L 9.4 14.0 L 8.4 13.9 L 7.4 14.2 L 6.4 14.1" />
+</Canvas>

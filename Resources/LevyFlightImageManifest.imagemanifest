@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LevyFlight image manifest for the VS Image Service.
+     Registers two vector (XAML) image sources as monikers so the Image
+     Service rasterizes them at the host's DPI (crisp at 250%). The XAML
+     files are embedded as WPF Resource items in the LevyFlight assembly;
+     the Resources symbol is a pack URI pointing at that assembly's
+     Component/Resources/ folder (same pattern as NuGet's
+     PackageIconMonikers.imagemanifest).
+
+     Guid/ID pairs are intentionally reused from the .vsct GuidSymbols so
+     the existing <Icon guid="..." id="..." /> references resolve to these
+     monikers once the legacy <Bitmap> declarations are removed:
+       - BrandIcon   -> guidBrandIcon        {b2c3d4e5-...} ID 1
+       - BookmarkIcon-> guidBookmarkMenuIcon  {a1b2c3d4-...} ID 1
+     AllowColorInversion=false keeps the brand/bookmark colors stable in
+     high-contrast themes instead of being inverted. -->
+<ImageManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+               xmlns="http://schemas.microsoft.com/VisualStudio/ImageManifestSchema/2014">
+  <Symbols>
+    <String Name="Resources" Value="/LevyFlight;Component/Resources/" />
+    <Guid Name="guidBrandIcon" Value="{b2c3d4e5-f6a7-8901-bcde-f23456789012}" />
+    <Guid Name="guidBookmarkMenuIcon" Value="{a1b2c3d4-e5f6-7890-abcd-ef1234567890}" />
+    <ID Name="bmpBrandIcon" Value="1" />
+    <ID Name="bmpBookmarkIcon" Value="1" />
+  </Symbols>
+  <Images>
+    <Image Guid="$(guidBrandIcon)" ID="$(bmpBrandIcon)" AllowColorInversion="false">
+      <Source Uri="$(Resources)/LevyFlightBrandIcon.xaml" />
+    </Image>
+    <Image Guid="$(guidBookmarkMenuIcon)" ID="$(bmpBookmarkIcon)" AllowColorInversion="false">
+      <Source Uri="$(Resources)/BookmarkMenuIcon.xaml" />
+    </Image>
+  </Images>
+  <ImageLists />
+</ImageManifest>
