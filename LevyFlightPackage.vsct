@@ -38,11 +38,23 @@
           <CommandName>LevyFlight</CommandName>
         </Strings>
       </Menu>
+
+      <Menu guid="guidLevyFlightPackageCmdSet" id="LevyFlightToolbar" priority="0x700" type="Toolbar">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_TOOL_STANDARD" />
+        <CommandFlag>DefaultDocked</CommandFlag>
+        <Strings>
+          <ButtonText>LevyFlight</ButtonText>
+          <CommandName>LevyFlight</CommandName>
+        </Strings>
+      </Menu>
     </Menus>
 
     <Groups>
       <Group guid="guidLevyFlightPackageCmdSet" id="MyMenuGroup" priority="0x0600">
         <Parent guid="guidLevyFlightPackageCmdSet" id="TopLevelMenu" />
+      </Group>
+      <Group guid="guidLevyFlightPackageCmdSet" id="ToolbarGroup" priority="0x0000">
+        <Parent guid="guidLevyFlightPackageCmdSet" id="LevyFlightToolbar" />
       </Group>
     </Groups>
     
@@ -141,6 +153,15 @@
     </Bitmaps>
   </Commands>
 
+  <CommandPlacements>
+    <CommandPlacement guid="guidLevyFlightPackageCmdSet" id="LevyFlightWindowCommandId" priority="0x0100">
+      <Parent guid="guidLevyFlightPackageCmdSet" id="ToolbarGroup" />
+    </CommandPlacement>
+    <CommandPlacement guid="guidLevyFlightPackageCmdSet" id="LevyFlightToggleBookmarkCommandId" priority="0x0110">
+      <Parent guid="guidLevyFlightPackageCmdSet" id="ToolbarGroup" />
+    </CommandPlacement>
+  </CommandPlacements>
+
   <KeyBindings>
     <KeyBinding guid="guidLevyFlightPackageCmdSet" id="LevyFlightToggleBookmarkCommandId" editor="guidVSStdEditorText" key1="B" mod1="Control Shift"/>
     <KeyBinding guid="guidLevyFlightPackageCmdSet" id="LevyFlightWindowCommandId" editor="guidVSStd97" key1="P" mod1="Control"/>
@@ -153,7 +174,9 @@
     <!-- This is the guid used to group the menu commands together -->
     <GuidSymbol name="guidLevyFlightPackageCmdSet" value="{e0650b9a-53f3-4f9e-a1ea-e8a9be49290c}">
       <IDSymbol name="TopLevelMenu" value="0x1021" />
+      <IDSymbol name="LevyFlightToolbar" value="0x1030" />
       <IDSymbol name="MyMenuGroup" value="0x1020" />
+      <IDSymbol name="ToolbarGroup" value="0x1031" />
       <IDSymbol name="LevyFlightWindowCommandId" value="0x0100" />
       <IDSymbol name="BirdsEyeViewCommandId" value="0x0120" />
       <IDSymbol name="LevyFlightToggleBookmarkCommandId" value="0x0110" />
