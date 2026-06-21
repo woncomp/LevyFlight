@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:LevyFlight"
+             xmlns:ae="http://icsharpcode.net/sharpdevelop/avalonedit"
              xmlns:imaging="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.Imaging"
              xmlns:platformUI="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
              xmlns:shell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
@@ -121,8 +122,23 @@
                               HorizontalAlignment="Center" VerticalAlignment="Stretch"
                               ResizeBehavior="PreviousAndNext"
                               Background="{DynamicResource {x:Static platformUI:EnvironmentColors.ToolWindowBorderBrushKey}}"/>
-                <TextBlock Grid.Column="2" Text="{Binding Path=DebugString}" FontFamily="Cascadia Mono"
-                           Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
+                <Grid Grid.Column="2">
+                    <ae:TextEditor Name="codePreview"
+                                   IsReadOnly="True"
+                                   ShowLineNumbers="True"
+                                   FontFamily="Consolas"
+                                   Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
+                                   Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
+                    <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="4"
+                            Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
+                            BorderBrush="{DynamicResource {x:Static platformUI:EnvironmentColors.ToolWindowBorderBrushKey}}"
+                            BorderThickness="1" CornerRadius="2" Padding="6,4" Opacity="0.95"
+                            IsHitTestVisible="False"
+                            Visibility="{Binding DiagnosticOverlayVisibility}">
+                        <TextBlock Text="{Binding Path=DebugString}" FontFamily="Cascadia Mono" FontSize="10"
+                                   Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
+                    </Border>
+                </Grid>
             </Grid>
         </Border>
         <TextBlock Grid.Row="2" Text="{Binding Path=SelectedItemFullPath}"

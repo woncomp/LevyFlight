@@ -48,6 +48,7 @@
     <Compile Include="AlternationIndexToBrushConverter.cs" />
     <Compile Include="BookmarkGlyphFactory.cs" />
     <Compile Include="BookmarkTagger.cs" />
+    <Compile Include="CodePreviewManager.cs" />
     <Compile Include="CommonMixin.cs" />
     <Compile Include="ExtensionErrorHandler.cs" />
     <Compile Include="JumpItem.cs" />
@@ -94,6 +95,7 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="AvalonEdit" Version="6.3.0.90" />
     <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.0.32112.339" ExcludeAssets="runtime" />
     <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.12.2069">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

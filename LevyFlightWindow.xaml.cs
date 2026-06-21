@@ -1,4 +1,7 @@
-﻿using Microsoft.VisualStudio.Settings;
+﻿using ICSharpCode.AvalonEdit;
+using ICSharpCode.AvalonEdit.Highlighting;
+using ICSharpCode.AvalonEdit.Rendering;
+using Microsoft.VisualStudio.Settings;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Settings;
 using Microsoft.VisualStudio.TextManager.Interop;
@@ -13,6 +16,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -81,13 +85,31 @@ namespace LevyFlight
             }
         }
 
+        public Visibility DiagnosticOverlayVisibility
+        {
+            get { return diagnosticOverlayVisibility; }
+            set
+            {
+                diagnosticOverlayVisibility = value;
+                OnPropertyChanged();
+            }
+        }
+
         private CMD cmd;
         private DispatcherTimer filterUpdateTimer;
+        private DispatcherTimer previewLoadTimer;
+        private CancellationTokenSource previewLoadCts;
+        private TargetLineRenderer targetLineRenderer;
 
         private string debugString;
         private string selectedItemFullPath;
+        private Visibility diagnosticOverlayVisibility = Visibility.Collapsed;
+        private JumpItem pendingPreviewItem;
 
         private Dictionary<Key, System.Func<bool>> windowsKeyBindings = new Dictionary<Key, Func<bool>>();
+
+        private const long MaxPreviewFileSizeBytes = 2 * 1024 * 1024; // 2 MB
+        private const int PreviewLoadDebounceMs = 75;
 
         internal LevyFlightWindow(CMD cmd)
         {
@@ -112,6 +134,16 @@ namespace LevyFlight
             filterUpdateTimer = new DispatcherTimer();
             filterUpdateTimer.Interval = TimeSpan.FromSeconds(0.3);
             filterUpdateTimer.Tick += FilterUpdateTimer_Tick;
+
+            previewLoadTimer = new DispatcherTimer();
+            previewLoadTimer.Interval = TimeSpan.FromMilliseconds(PreviewLoadDebounceMs);
+            previewLoadTimer.Tick += PreviewLoadTimer_Tick;
+
+            targetLineRenderer = new TargetLineRenderer();
+            codePreview.TextArea.TextView.BackgroundRenderers.Add(targetLineRenderer);
+            CodePreviewManager.ApplyThemeToEditor(codePreview);
+            CodePreviewManager.ThemeChanged += OnCodePreviewThemeChanged;
+            UpdateDiagnosticOverlayVisibility();
 
             SetupKeyBindings();
         }
@@ -490,6 +522,132 @@ namespace LevyFlight
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
+        private async Task LoadCodePreviewAsync(JumpItem jumpItem, CancellationToken cancellationToken)
+        {
+            if (jumpItem == null || string.IsNullOrEmpty(jumpItem.FullPath))
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+                ClearPreview();
+                return;
+            }
+
+            string path = jumpItem.FullPath;
+            if (!File.Exists(path))
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+                ShowPlaceholder($"// File not found: {path}");
+                return;
+            }
+
+            string text;
+            try
+            {
+                var fileInfo = new FileInfo(path);
+                if (fileInfo.Length > MaxPreviewFileSizeBytes)
+                {
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+                    ShowPlaceholder($"// File too large to preview: {path}");
+                    return;
+                }
+
+                using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    if (await IsBinaryAsync(stream, cancellationToken))
+                    {
+                        await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+                        ShowPlaceholder("// Binary file not previewable");
+                        return;
+                    }
+
+                    using (var reader = new StreamReader(stream))
+                    {
+                        text = await reader.ReadToEndAsync().ConfigureAwait(false);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+                ShowPlaceholder($"// Failed to load file: {ex.Message}");
+                return;
+            }
+
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            codePreview.Text = text;
+            codePreview.SyntaxHighlighting = CodePreviewManager.GetHighlightingDefinition(path);
+
+            int targetLine = jumpItem.LineNumber > 0 ? jumpItem.LineNumber : -1;
+            if (targetLine > 0)
+            {
+                int line = Math.Min(targetLine, codePreview.Document.LineCount);
+                int column = jumpItem.CaretColumn >= 0 ? jumpItem.CaretColumn + 1 : 1;
+                codePreview.ScrollToLine(line);
+                codePreview.TextArea.Caret.Line = line;
+                codePreview.TextArea.Caret.Column = column;
+                codePreview.TextArea.Caret.BringCaretToView();
+                CenterLine(line);
+                HighlightTargetLine(line);
+            }
+            else
+            {
+                HighlightTargetLine(-1);
+            }
+        }
+
+        private static async Task<bool> IsBinaryAsync(Stream stream, CancellationToken cancellationToken)
+        {
+            byte[] buffer = new byte[1024];
+            int read = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
+            for (int i = 0; i < read; i++)
+            {
+                if (buffer[i] == 0)
+                    return true;
+            }
+            stream.Position = 0;
+            return false;
+        }
+
+        private void ClearPreview()
+        {
+            codePreview.Clear();
+            codePreview.SyntaxHighlighting = null;
+            HighlightTargetLine(-1);
+        }
+
+        private void ShowPlaceholder(string message)
+        {
+            codePreview.Text = message;
+            codePreview.SyntaxHighlighting = null;
+            HighlightTargetLine(-1);
+        }
+
+        private void CenterLine(int lineNumber)
+        {
+            var textView = codePreview.TextArea.TextView;
+            textView.EnsureVisualLines();
+            var visualLine = textView.GetVisualLine(lineNumber);
+            if (visualLine == null)
+                return;
+
+            double lineTop = visualLine.VisualTop;
+            double lineHeight = visualLine.Height;
+            double viewportHeight = textView.ActualHeight;
+            double desiredOffset = lineTop + lineHeight / 2.0 - viewportHeight / 2.0;
+            codePreview.ScrollToVerticalOffset(Math.Max(0, desiredOffset));
+        }
+
+        private void HighlightTargetLine(int lineNumber)
+        {
+            targetLineRenderer.TargetLine = lineNumber;
+            codePreview.TextArea.TextView.InvalidateLayer(KnownLayer.Background);
+        }
+
         private void lstFiles_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             var jumpItem = lstFiles.SelectedItem as JumpItem;
@@ -503,6 +661,46 @@ namespace LevyFlight
                 SelectedItemFullPath = jumpItem.FullPath;
                 DebugString = jumpItem.DebugString;
             }
+
+            UpdateDiagnosticOverlayVisibility();
+            SchedulePreviewLoad(jumpItem);
+        }
+
+        private void SchedulePreviewLoad(JumpItem jumpItem)
+        {
+            previewLoadTimer?.Stop();
+            previewLoadCts?.Cancel();
+            previewLoadCts?.Dispose();
+            previewLoadCts = new CancellationTokenSource();
+            pendingPreviewItem = jumpItem;
+            previewLoadTimer?.Start();
+        }
+
+        private void PreviewLoadTimer_Tick(object sender, EventArgs e)
+        {
+            previewLoadTimer.Stop();
+            var item = pendingPreviewItem;
+            var cts = previewLoadCts;
+            _ = ExtensionErrorHandler.ExecuteAsync(() => LoadCodePreviewAsync(item, cts.Token), "Load code preview");
+        }
+
+        private void UpdateDiagnosticOverlayVisibility()
+        {
+            DiagnosticOverlayVisibility = LevyFlightOptions.Diagnostic ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void OnCodePreviewThemeChanged(object sender, EventArgs e)
+        {
+            ExtensionErrorHandler.Execute(() =>
+            {
+                CodePreviewManager.ApplyThemeToEditor(codePreview);
+                var jumpItem = lstFiles.SelectedItem as JumpItem;
+                if (jumpItem != null)
+                {
+                    codePreview.SyntaxHighlighting = CodePreviewManager.GetHighlightingDefinition(jumpItem.FullPath);
+                    HighlightTargetLine(jumpItem.LineNumber > 0 ? jumpItem.LineNumber : -1);
+                }
+            }, "Apply code preview theme");
         }
 
         private void txtFilter_TextChanged(object sender, TextChangedEventArgs e)
@@ -665,6 +863,11 @@ namespace LevyFlight
             {
                 SaveWindowSettings();
                 Filter.Instance.Reset();
+
+                previewLoadTimer?.Stop();
+                previewLoadCts?.Cancel();
+                previewLoadCts?.Dispose();
+                CodePreviewManager.ThemeChanged -= OnCodePreviewThemeChanged;
             }, "Quick-open window closing");
         }
 
@@ -678,6 +881,7 @@ namespace LevyFlight
                     Owner = this
                 };
                 window.ShowDialog();
+                UpdateDiagnosticOverlayVisibility();
             }, "Open Levy Flight settings");
         }
     }
