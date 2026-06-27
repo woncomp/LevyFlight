@@ -5,6 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:shell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
              mc:Ignorable="d" Title="Levy Flight" ShowInTaskbar="False"
+             WindowStartupLocation="CenterScreen"
              d:DesignHeight="450" d:DesignWidth="800"
              Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
              Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"
@@ -12,7 +13,7 @@
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </Window.Resources>
-    
+
     <Grid>
         <!-- Host for the real quick-open UI, loaded lazily -->
         <ContentPresenter x:Name="contentHost" />

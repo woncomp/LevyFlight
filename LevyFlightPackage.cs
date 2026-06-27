@@ -29,7 +29,8 @@ namespace LevyFlight
     [ProvideAutoLoad(VSConstants.UICONTEXT.SolutionExists_string, PackageAutoLoadFlags.BackgroundLoad)]
     [Guid(LevyFlightPackage.PackageGuidString)]
     [ProvideMenuResource("Menus.ctmenu", 1)]
-    [ProvideToolWindow(typeof(LevyFlightWindow))]
+    // Note: LevyFlightWindow is a plain WPF Window shown via ShowDialog(), not a
+    // ToolWindowPane, so it must NOT be registered with [ProvideToolWindow].
     [ProvideToolWindow(typeof(TreeSitterOutlineView), Style = VsDockStyle.Tabbed, Window = "3ae79031-e1bc-11d0-8f78-00a0c9110057")]
     public sealed class LevyFlightPackage : AsyncPackage
     {
