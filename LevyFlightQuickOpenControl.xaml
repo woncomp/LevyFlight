@@ -67,8 +67,6 @@
                                             <Setter TargetName="Bd" Property="Background" Value="#40808080"/>
                                         </Trigger>
                                         <Trigger Property="IsChecked" Value="True">
-                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarMenuItemMouseOverBackgroundBeginBrushKey}}"/>
-                                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarMenuItemMouseOverBorderBrushKey}}"/>
                                             <Setter TargetName="Bd" Property="BorderThickness" Value="1"/>
                                             <Setter Property="Foreground" Value="White"/>
                                         </Trigger>
