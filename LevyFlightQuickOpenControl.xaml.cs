@@ -76,6 +76,29 @@ namespace LevyFlight
             }
         }
 
+        public List<PresetViewModel> PresetViewModels { get; private set; }
+
+        private bool isCtrlPressed;
+        public bool IsCtrlPressed
+        {
+            get => isCtrlPressed;
+            set
+            {
+                isCtrlPressed = value;
+                OnPropertyChanged();
+                // Update all presets' ShowShortcut
+                if (PresetViewModels != null)
+                {
+                    foreach (var preset in PresetViewModels)
+                    {
+                        preset.ShowShortcut = value;
+                    }
+                }
+            }
+        }
+
+        private PresetViewModel currentPreset;
+
         private DispatcherTimer filterUpdateTimer;
         private DispatcherTimer previewLoadTimer;
         private CancellationTokenSource previewLoadCts;
@@ -130,6 +153,7 @@ namespace LevyFlight
             UpdateDiagnosticOverlayVisibility();
 
             SetupKeyBindings();
+            InitializePresets();
 
             await Task.Yield();
 
@@ -139,7 +163,20 @@ namespace LevyFlight
         private void ViewSource_Filter(object sender, FilterEventArgs e)
         {
             JumpItem jumpItem = e.Item as JumpItem;
-            e.Accepted = jumpItem.Score > 0;
+            if (jumpItem.Score <= 0)
+            {
+                e.Accepted = false;
+                return;
+            }
+
+            if (currentPreset != null && !currentPreset.IncludeAll &&
+                !currentPreset.IncludedCategories.Contains(jumpItem.Category))
+            {
+                e.Accepted = false;
+                return;
+            }
+
+            e.Accepted = true;
         }
 
         private void SetupKeyBindings()
@@ -148,6 +185,45 @@ namespace LevyFlight
             windowsKeyBindings[Key.K] = () => { MoveSelection(lstFiles.SelectedIndex - 1); return true; };
             windowsKeyBindings[Key.D] = () => { FastMove(+1); return true; }; // Ctrl+D half page down
             windowsKeyBindings[Key.U] = () => { FastMove(-1); return true; }; // Ctrl+U half page up
+        }
+
+        private void InitializePresets()
+        {
+            PresetViewModels = QuickOpenPreset.DefaultPresets.Select(p => new PresetViewModel
+            {
+                Name = p.Name,
+                ShortcutKey = p.ShortcutKey,
+                ShortcutLetter = p.ShortcutLetter,
+                IncludedCategories = p.IncludedCategories,
+                IsActive = p.Name == "All In One",
+                ShowShortcut = false
+            }).ToList();
+
+            currentPreset = PresetViewModels.First(p => p.Name == "All In One");
+        }
+
+        private void ActivatePreset(PresetViewModel preset)
+        {
+            if (currentPreset == preset) return;
+
+            currentPreset.IsActive = false;
+            preset.IsActive = true;
+            currentPreset = preset;
+
+            using (ViewSource.DeferRefresh())
+            {
+                ViewSource.View.Refresh();
+            }
+            RefreshQuickOpenIndices();
+            txtFilter.Focus();
+        }
+
+        private void SelectPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is PresetViewModel preset)
+            {
+                ActivatePreset(preset);
+            }
         }
 
         private void FastMove(int direction)
@@ -723,6 +799,10 @@ namespace LevyFlight
             ExtensionErrorHandler.Execute(() =>
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
+
+                // Update Ctrl state for shortcut overlay
+                IsCtrlPressed = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+
                 if (e.Key == Key.Enter || e.Key == Key.Return)
                 {
                     e.Handled = true;
@@ -737,12 +817,25 @@ namespace LevyFlight
                     e.Handled = true;
                     RequestClose?.Invoke(this, EventArgs.Empty);
                 }
-                else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && windowsKeyBindings.ContainsKey(e.Key))
-                {
-                    e.Handled = windowsKeyBindings[e.Key]();
-                }
                 else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
                 {
+                    // Check preset shortcuts first
+                    var preset = PresetViewModels?.FirstOrDefault(p => p.ShortcutKey == e.Key);
+                    if (preset != null)
+                    {
+                        ActivatePreset(preset);
+                        e.Handled = true;
+                        return;
+                    }
+
+                    // Then check window key bindings (J/K/D/U)
+                    if (windowsKeyBindings.ContainsKey(e.Key))
+                    {
+                        e.Handled = windowsKeyBindings[e.Key]();
+                        return;
+                    }
+
+                    // Then check quick open item keys
                     var qi = GetQuickOpenItemForKey(e.Key);
                     if (qi != null)
                     {
@@ -758,8 +851,22 @@ namespace LevyFlight
             ExtensionErrorHandler.Execute(() =>
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
+
+                // Update Ctrl state for shortcut overlay
+                IsCtrlPressed = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+
                 if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
                 {
+                    // Check preset shortcuts first
+                    var preset = PresetViewModels?.FirstOrDefault(p => p.ShortcutKey == e.Key);
+                    if (preset != null)
+                    {
+                        ActivatePreset(preset);
+                        e.Handled = true;
+                        return;
+                    }
+
+                    // Then check quick open item keys
                     var qi = GetQuickOpenItemForKey(e.Key);
                     if (qi != null)
                     {
@@ -768,6 +875,14 @@ namespace LevyFlight
                     }
                 }
             }, "Quick-open control preview key down");
+        }
+
+        private void UserControl_KeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
+            {
+                IsCtrlPressed = false;
+            }
         }
 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)

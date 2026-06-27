@@ -12,10 +12,14 @@
              d:DesignHeight="450" d:DesignWidth="800"
              Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
              Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"
-             Loaded="UserControl_Loaded"
-             Unloaded="UserControl_Unloaded"
-             PreviewKeyDown="UserControl_PreviewKeyDown"
-             KeyDown="UserControl_KeyDown">
+              Loaded="UserControl_Loaded"
+              Unloaded="UserControl_Unloaded"
+              PreviewKeyDown="UserControl_PreviewKeyDown"
+              KeyDown="UserControl_KeyDown"
+              KeyUp="UserControl_KeyUp">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </UserControl.Resources>
     <Grid Margin="2">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -40,12 +44,67 @@
                     <Style TargetType="{x:Type Label}">
                         <Setter Property="Foreground" Value="{DynamicResource {x:Static shell:VsBrushes.GrayTextKey}}"/>
                     </Style>
+                    <Style x:Key="PresetButtonStyle" TargetType="RadioButton">
+                        <Setter Property="Margin" Value="2,0,0,0"/>
+                        <Setter Property="Background" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarMouseOverBackgroundBeginBrushKey}}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="Padding" Value="6,2"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="RadioButton">
+                                    <Border x:Name="Bd"
+                                            Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                            Padding="{TemplateBinding Padding}"
+                                            CornerRadius="2"
+                                            SnapsToDevicePixels="True">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="#40808080"/>
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarMenuItemMouseOverBackgroundBeginBrushKey}}"/>
+                                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource {x:Static platformUI:EnvironmentColors.CommandBarMenuItemMouseOverBorderBrushKey}}"/>
+                                            <Setter TargetName="Bd" Property="BorderThickness" Value="1"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
                 </StackPanel.Resources>
                 <Label>|</Label>
-                <Button>All In One</Button>
-                <Button>Files</Button>
-                <Button>Bookmarks</Button>
-                <Button>Edits</Button>
+                <ItemsControl ItemsSource="{Binding PresetViewModels}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type local:PresetViewModel}">
+                            <RadioButton IsChecked="{Binding IsActive}"
+                                         GroupName="PresetGroup"
+                                         Style="{StaticResource PresetButtonStyle}"
+                                         Click="SelectPreset_Click">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}"/>
+                                    <TextBlock Text="{Binding ShortcutLetter}"
+                                               FontSize="9"
+                                               HorizontalAlignment="Center"
+                                               Foreground="#FFD700"
+                                               Margin="0,-2,0,0"
+                                               Visibility="{Binding ShowShortcut,
+                                                    Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                </StackPanel>
+                            </RadioButton>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
                 <Label>|</Label>
                 <Button Click="SettingsButton_Click">Settings</Button>
             </StackPanel>

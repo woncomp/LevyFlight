@@ -5,12 +5,15 @@ using Microsoft.VisualStudio.Imaging.Interop;
 using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using System.Windows.Shell;
 
 namespace LevyFlight
@@ -220,6 +223,81 @@ namespace LevyFlight
         OpenFile,
         Transition,
         HotFile,
+    }
+
+    public class QuickOpenPreset
+    {
+        public string Name { get; set; }
+        public Key ShortcutKey { get; set; }
+        public string ShortcutLetter { get; set; }
+        public HashSet<Category> IncludedCategories { get; set; }
+        public bool IncludeAll => IncludedCategories == null || IncludedCategories.Count == 0;
+
+        public static readonly QuickOpenPreset[] DefaultPresets = new[]
+        {
+            new QuickOpenPreset
+            {
+                Name = "All In One",
+                ShortcutKey = Key.H,
+                ShortcutLetter = "H",
+                IncludedCategories = null
+            },
+            new QuickOpenPreset
+            {
+                Name = "Files",
+                ShortcutKey = Key.F,
+                ShortcutLetter = "F",
+                IncludedCategories = new HashSet<Category>
+                {
+                    Category.HotFile, Category.Transition, Category.OpenFile,
+                    Category.RecentFile, Category.ActiveDirectoryFile
+                }
+            },
+            new QuickOpenPreset
+            {
+                Name = "Bookmarks",
+                ShortcutKey = Key.B,
+                ShortcutLetter = "B",
+                IncludedCategories = new HashSet<Category> { Category.Bookmark }
+            },
+            new QuickOpenPreset
+            {
+                Name = "Edits",
+                ShortcutKey = Key.M,
+                ShortcutLetter = "M",
+                IncludedCategories = new HashSet<Category> { Category.RecentFile }
+            },
+        };
+    }
+
+    public class PresetViewModel : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public string Name { get; set; }
+        public string ShortcutLetter { get; set; }
+        public Key ShortcutKey { get; set; }
+        public HashSet<Category> IncludedCategories { get; set; }
+        public bool IncludeAll => IncludedCategories == null || IncludedCategories.Count == 0;
+
+        private bool isActive;
+        public bool IsActive
+        {
+            get => isActive;
+            set { isActive = value; OnPropertyChanged(); }
+        }
+
+        private bool showShortcut;
+        public bool ShowShortcut
+        {
+            get => showShortcut;
+            set { showShortcut = value; OnPropertyChanged(); }
+        }
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 
     public class Filter
