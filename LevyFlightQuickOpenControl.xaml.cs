@@ -16,6 +16,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -86,15 +87,101 @@ namespace LevyFlight
             {
                 isCtrlPressed = value;
                 OnPropertyChanged();
-                // Update all presets' ShowShortcut
-                if (PresetViewModels != null)
+                UpdateKeyTips(value);
+            }
+        }
+
+        private void UpdateKeyTips(bool show)
+        {
+            if (show)
+            {
+                ShowKeyTips();
+            }
+            else
+            {
+                HideKeyTips();
+            }
+        }
+
+        private void ShowKeyTips()
+        {
+            if (PresetItemsControl == null || PresetViewModels == null)
+            {
+                return;
+            }
+
+            foreach (var preset in PresetViewModels)
+            {
+                if (activeKeyTips.ContainsKey(preset))
                 {
-                    foreach (var preset in PresetViewModels)
-                    {
-                        preset.ShowShortcut = value;
-                    }
+                    continue;
+                }
+
+                var radioButton = FindRadioButtonForPreset(preset);
+                if (radioButton == null)
+                {
+                    continue;
+                }
+
+                var adornerLayer = AdornerLayer.GetAdornerLayer(radioButton);
+                if (adornerLayer == null)
+                {
+                    continue;
+                }
+
+                var adorner = new KeyTipAdorner(radioButton, preset.ShortcutLetter);
+                adornerLayer.Add(adorner);
+                activeKeyTips[preset] = adorner;
+            }
+        }
+
+        private void HideKeyTips()
+        {
+            foreach (var pair in activeKeyTips)
+            {
+                var adornerLayer = AdornerLayer.GetAdornerLayer(pair.Value.Target);
+                if (adornerLayer != null)
+                {
+                    adornerLayer.Remove(pair.Value);
                 }
             }
+            activeKeyTips.Clear();
+        }
+
+        private RadioButton FindRadioButtonForPreset(PresetViewModel preset)
+        {
+            var container = PresetItemsControl.ItemContainerGenerator.ContainerFromItem(preset);
+            if (container == null)
+            {
+                return null;
+            }
+            return FindVisualChild<RadioButton>(container);
+        }
+
+        private static T FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            if (parent == null)
+            {
+                return null;
+            }
+
+            int childCount = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < childCount; i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T typedChild)
+                {
+                    return typedChild;
+                }
+
+                var result = FindVisualChild<T>(child);
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+
+            return null;
         }
 
         private PresetViewModel currentPreset;
@@ -110,6 +197,8 @@ namespace LevyFlight
         private JumpItem pendingPreviewItem;
 
         private Dictionary<Key, System.Func<bool>> windowsKeyBindings = new Dictionary<Key, Func<bool>>();
+
+        private readonly Dictionary<PresetViewModel, KeyTipAdorner> activeKeyTips = new Dictionary<PresetViewModel, KeyTipAdorner>();
 
         private const long MaxPreviewFileSizeBytes = 2 * 1024 * 1024; // 2 MB
         private const int PreviewLoadDebounceMs = 75;
@@ -196,7 +285,6 @@ namespace LevyFlight
                 ShortcutLetter = p.ShortcutLetter,
                 IncludedCategories = p.IncludedCategories,
                 IsActive = p.Name == "All In One",
-                ShowShortcut = false
             }).ToList();
 
             currentPreset = PresetViewModels.First(p => p.Name == "All In One");
@@ -903,6 +991,7 @@ namespace LevyFlight
                 previewLoadCts?.Cancel();
                 previewLoadCts?.Dispose();
                 CodePreviewManager.ThemeChanged -= OnCodePreviewThemeChanged;
+                HideKeyTips();
             }, "Quick-open control unloaded");
         }
 

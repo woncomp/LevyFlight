@@ -287,13 +287,6 @@ namespace LevyFlight
             set { isActive = value; OnPropertyChanged(); }
         }
 
-        private bool showShortcut;
-        public bool ShowShortcut
-        {
-            get => showShortcut;
-            set { showShortcut = value; OnPropertyChanged(); }
-        }
-
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

@@ -17,9 +17,6 @@
               PreviewKeyDown="UserControl_PreviewKeyDown"
               KeyDown="UserControl_KeyDown"
               KeyUp="UserControl_KeyUp">
-    <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-    </UserControl.Resources>
     <Grid Margin="2">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -77,7 +74,7 @@
                     </Style>
                 </StackPanel.Resources>
                 <Label>|</Label>
-                <ItemsControl ItemsSource="{Binding PresetViewModels}">
+                <ItemsControl x:Name="PresetItemsControl" ItemsSource="{Binding PresetViewModels}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <StackPanel Orientation="Horizontal"/>
@@ -89,16 +86,7 @@
                                          GroupName="PresetGroup"
                                          Style="{StaticResource PresetButtonStyle}"
                                          Click="SelectPreset_Click">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Name}"/>
-                                    <TextBlock Text="{Binding ShortcutLetter}"
-                                               FontSize="9"
-                                               HorizontalAlignment="Center"
-                                               Foreground="#FFD700"
-                                               Margin="0,-2,0,0"
-                                               Visibility="{Binding ShowShortcut,
-                                                    Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                                </StackPanel>
+                                <TextBlock Text="{Binding Name}"/>
                             </RadioButton>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
