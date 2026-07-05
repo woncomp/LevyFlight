@@ -31,7 +31,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: LevyFlight.vsix
-          path: bin\Release\LevyFlight.vsix
+          path: LevyFlight\bin\Release\LevyFlight.vsix
 
   release:
     needs: build
