@@ -33,3 +33,10 @@ When creating Git worktrees, create them under the `<repo>/worktrees/` directory
 
 This is a folder to keep critical design changes or difficult issues that are easy to break again. They are there to remind developers and agents to be careful of some unobvious details.
 When the user asks, the agent may summarize the key details while implementing the last request, and create a document in the `IssueHistory` folder, the file name pattern is `{YYMMDD}-{brief-title}.md`.
+
+## Computer Use
+
+You may have access to a Computer Use facility in your development environment.
+Don't use it by default, only use it when a user asks. Such as:
+* Please implement the plan and verify it using Computer Use.
+* Please verify the feature after implementation using Computer Use in the coming tasks of this session.
