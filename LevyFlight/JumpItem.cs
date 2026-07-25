@@ -40,6 +40,9 @@ namespace LevyFlight
         /// <summary>True for function prototypes/forward declarations (vs full definitions).</summary>
         public bool IsDeclaration { get; set; }
 
+        /// <summary>Score bonus applied within a category (e.g. recency rank of edit regions). Must stay below the category score quantum.</summary>
+        public uint ExtraScore { get; set; }
+
         private ScoreComponent_WholeWord _scWholeWord;
         private ScoreComponent_PathKeywordCI _scPathKeywordCI;
         private ScoreComponent_NameKeywordCI _scNameKeywordCI;
@@ -50,7 +53,8 @@ namespace LevyFlight
             {
                 if (LineNumber >= 0)
                 {
-                    return $"{Name}(Line:{LineNumber})";
+                    // LineNumber is a 0-based VS line; display it 1-based like the editor does.
+                    return $"{Name}(Line:{LineNumber + 1})";
                 }
                 else
                 {
@@ -113,6 +117,9 @@ namespace LevyFlight
                 case Category.TreeSitter:
                     IconMoniker = KnownMonikers.MethodPublic; // overridden at creation time
                     break;
+                case Category.RecentEdit:
+                    IconMoniker = KnownMonikers.Edit;
+                    break;
                 default:
                     IconMoniker = GetFileIconMoniker(fullPath);
                     break;
@@ -163,6 +170,10 @@ namespace LevyFlight
             if (_scWholeWord.Score == 0 && numKeywords > _scPathKeywordCI.Score && numKeywords > _scNameKeywordCI.Score)
             {
                 score = 0; // Only accept items that at least match all keywords in the fullpath or get a whole word match
+            }
+            if (score > 0)
+            {
+                score += ExtraScore;
             }
             this.Score = score;
         }
@@ -223,6 +234,7 @@ namespace LevyFlight
         OpenFile,
         Transition,
         HotFile,
+        RecentEdit,
     }
 
     public class QuickOpenPreset
@@ -265,7 +277,7 @@ namespace LevyFlight
                 Name = "Edits",
                 ShortcutKey = Key.M,
                 ShortcutLetter = "M",
-                IncludedCategories = new HashSet<Category> { Category.RecentFile }
+                IncludedCategories = new HashSet<Category> { Category.RecentEdit, Category.RecentFile }
             },
         };
     }

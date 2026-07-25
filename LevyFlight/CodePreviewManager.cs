@@ -277,17 +277,46 @@ namespace LevyFlight
     {
         private static Brush darkBrush;
         private static Brush lightBrush;
+        private static Brush darkRangeBrush;
+        private static Brush lightRangeBrush;
 
+        /// <summary>1-based document line to emphasize; -1 disables.</summary>
         public int TargetLine { get; set; } = -1;
+
+        /// <summary>1-based inclusive document line ranges to highlight (e.g. recent edit regions).</summary>
+        public List<(int Start, int End)> Ranges { get; } = new List<(int Start, int End)>();
 
         public KnownLayer Layer => KnownLayer.Background;
 
         public void Draw(TextView textView, DrawingContext drawingContext)
         {
-            if (TargetLine < 1)
-                return;
+            bool targetInRange = false;
+            if (Ranges.Count > 0)
+            {
+                var rangeBrush = GetRangeBrush();
+                foreach (var (start, end) in Ranges)
+                {
+                    for (int line = Math.Max(1, start); line <= end; line++)
+                    {
+                        DrawLineHighlight(textView, drawingContext, line, rangeBrush);
+                    }
+                    if (TargetLine >= start && TargetLine <= end)
+                        targetInRange = true;
+                }
+            }
 
-            var visualLine = textView.GetVisualLine(TargetLine);
+            // Skip the extra target-line layer when it is already inside a highlighted
+            // range, so the whole region keeps one uniform depth (like VS's native
+            // track-changes highlighting). The caret + scroll centering mark the target.
+            if (TargetLine >= 1 && !targetInRange)
+            {
+                DrawLineHighlight(textView, drawingContext, TargetLine, GetTargetLineBrush());
+            }
+        }
+
+        private static void DrawLineHighlight(TextView textView, DrawingContext drawingContext, int lineNumber, Brush brush)
+        {
+            var visualLine = textView.GetVisualLine(lineNumber);
             if (visualLine == null)
                 return;
 
@@ -296,33 +325,33 @@ namespace LevyFlight
                 return;
 
             var rect = rects.First();
-            drawingContext.DrawRectangle(GetTargetLineBrush(), null, new Rect(0, rect.Top, textView.ActualWidth, rect.Height));
+            drawingContext.DrawRectangle(brush, null, new Rect(0, rect.Top, textView.ActualWidth, rect.Height));
         }
 
         private static Brush GetTargetLineBrush()
         {
+            return IsDarkTheme()
+                ? (darkBrush ?? (darkBrush = new SolidColorBrush(Color.FromArgb(80, 100, 200, 255))))
+                : (lightBrush ?? (lightBrush = new SolidColorBrush(Color.FromArgb(60, 255, 200, 50))));
+        }
+
+        private static Brush GetRangeBrush()
+        {
+            return IsDarkTheme()
+                ? (darkRangeBrush ?? (darkRangeBrush = new SolidColorBrush(Color.FromArgb(80, 100, 200, 255))))
+                : (lightRangeBrush ?? (lightRangeBrush = new SolidColorBrush(Color.FromArgb(60, 255, 200, 50))));
+        }
+
+        private static bool IsDarkTheme()
+        {
             try
             {
                 var color = VSColorTheme.GetThemedColor(EnvironmentColors.ToolWindowBackgroundColorKey);
-                bool dark = (color.R + color.G + color.B) / 3.0 < 128;
-                if (dark)
-                {
-                    if (darkBrush == null)
-                        darkBrush = new SolidColorBrush(Color.FromArgb(80, 100, 200, 255));
-                    return darkBrush;
-                }
-                else
-                {
-                    if (lightBrush == null)
-                        lightBrush = new SolidColorBrush(Color.FromArgb(60, 255, 200, 50));
-                    return lightBrush;
-                }
+                return (color.R + color.G + color.B) / 3.0 < 128;
             }
             catch
             {
-                if (lightBrush == null)
-                    lightBrush = new SolidColorBrush(Color.FromArgb(60, 255, 200, 50));
-                return lightBrush;
+                return false;
             }
         }
     }

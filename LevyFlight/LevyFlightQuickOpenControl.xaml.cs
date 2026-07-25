@@ -383,6 +383,18 @@ namespace LevyFlight
                 knownFiles.Add(currentFile);
             }
 
+            // Add recent edit regions first: this is the highest-priority category
+            int editRank = 0;
+            foreach (var region in RecentEditCollector.Collect())
+            {
+                var editItem = new JumpItem(Category.RecentEdit, region.FilePath);
+                editItem.SetPosition(region.JumpLine, 0);
+                editItem.ExtraScore = (uint)Math.Max(1, 99 - editRank);
+                AllJumpItems.Add(editItem);
+                knownFiles.Add(region.FilePath);
+                editRank++;
+            }
+
             // Add recent files
             var recentFiles = TransitionStore.Instance.Recents;
             var recentEnd = Math.Max(Math.Min(20, recentFiles.Count), recentFiles.Count * 3 / 4);
@@ -644,41 +656,59 @@ namespace LevyFlight
                 return;
             }
 
+            // For files open in VS, preview the live buffer (including unsaved edits) so the
+            // text matches the edit-region coordinates; other files are read from disk.
+            var openSnapshot = RecentEditCollector.GetOpenDocumentSnapshot(path);
+            List<RecentEditCollector.EditRegion> fileRegions = null;
             string text;
-            try
+
+            if (openSnapshot != null)
             {
-                var fileInfo = new FileInfo(path);
-                if (fileInfo.Length > MaxPreviewFileSizeBytes)
+                if (openSnapshot.Length > MaxPreviewFileSizeBytes)
                 {
-                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
                     ShowPlaceholder($"// File too large to preview: {path}");
                     return;
                 }
-
-                using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                text = openSnapshot.GetText();
+                fileRegions = RecentEditCollector.GetRegionsForFile(path);
+            }
+            else
+            {
+                try
                 {
-                    if (await IsBinaryAsync(stream, cancellationToken))
+                    var fileInfo = new FileInfo(path);
+                    if (fileInfo.Length > MaxPreviewFileSizeBytes)
                     {
                         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-                        ShowPlaceholder("// Binary file not previewable");
+                        ShowPlaceholder($"// File too large to preview: {path}");
                         return;
                     }
 
-                    using (var reader = new StreamReader(stream))
+                    using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                     {
-                        text = await reader.ReadToEndAsync().ConfigureAwait(false);
+                        if (await IsBinaryAsync(stream, cancellationToken))
+                        {
+                            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+                            ShowPlaceholder("// Binary file not previewable");
+                            return;
+                        }
+
+                        using (var reader = new StreamReader(stream))
+                        {
+                            text = await reader.ReadToEndAsync().ConfigureAwait(false);
+                        }
                     }
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-            catch (Exception ex)
-            {
-                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
-                ShowPlaceholder($"// Failed to load file: {ex.Message}");
-                return;
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+                    ShowPlaceholder($"// Failed to load file: {ex.Message}");
+                    return;
+                }
             }
 
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
@@ -687,7 +717,23 @@ namespace LevyFlight
             codePreview.Text = text;
             codePreview.SyntaxHighlighting = CodePreviewManager.GetHighlightingDefinition(path);
 
-            int targetLine = jumpItem.LineNumber > 0 ? jumpItem.LineNumber : -1;
+            // Highlight every recent edit region of the file, not just the item's own region.
+            targetLineRenderer.Ranges.Clear();
+            if (fileRegions != null)
+            {
+                foreach (var region in fileRegions)
+                {
+                    int rangeStart = Math.Min(region.StartLine + 1, codePreview.Document.LineCount);
+                    int rangeEnd = Math.Min(region.EndLine + 1, codePreview.Document.LineCount);
+                    if (rangeStart <= rangeEnd)
+                    {
+                        targetLineRenderer.Ranges.Add((rangeStart, rangeEnd));
+                    }
+                }
+            }
+
+            // LineNumber is a 0-based VS line; AvalonEdit lines are 1-based.
+            int targetLine = jumpItem.LineNumber >= 0 ? jumpItem.LineNumber + 1 : -1;
             if (targetLine > 0)
             {
                 int line = Math.Min(targetLine, codePreview.Document.LineCount);
@@ -722,6 +768,7 @@ namespace LevyFlight
         {
             codePreview.Clear();
             codePreview.SyntaxHighlighting = null;
+            targetLineRenderer.Ranges.Clear();
             HighlightTargetLine(-1);
         }
 
@@ -729,6 +776,7 @@ namespace LevyFlight
         {
             codePreview.Text = message;
             codePreview.SyntaxHighlighting = null;
+            targetLineRenderer.Ranges.Clear();
             HighlightTargetLine(-1);
         }
 
@@ -803,7 +851,7 @@ namespace LevyFlight
                 if (jumpItem != null)
                 {
                     codePreview.SyntaxHighlighting = CodePreviewManager.GetHighlightingDefinition(jumpItem.FullPath);
-                    HighlightTargetLine(jumpItem.LineNumber > 0 ? jumpItem.LineNumber : -1);
+                    HighlightTargetLine(jumpItem.LineNumber >= 0 ? jumpItem.LineNumber + 1 : -1);
                 }
             }, "Apply code preview theme");
         }

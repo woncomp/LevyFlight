@@ -182,6 +182,7 @@ namespace LevyFlight
 
             Instance.TextManager = await package.GetServiceAsync(typeof(SVsTextManager)) as IVsTextManager;
             Instance.ComponentModel = await package.GetServiceAsync(typeof(SComponentModel)) as IComponentModel;
+            RecentEditCollector.Initialize(Instance.ComponentModel, package);
         }
 
         public static DTE GetActiveIDE()
