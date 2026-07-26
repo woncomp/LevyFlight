@@ -3,30 +3,48 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
         Title="Levy Flight Settings"
-        Width="360"
-        Height="150"
-        ResizeMode="NoResize"
+        Width="430"
+        Height="510"
+        MinWidth="390"
+        MinHeight="420"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource {x:Static shell:VsBrushes.ToolWindowBackgroundKey}}"
         Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}">
     <Grid Margin="14">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel VerticalAlignment="Top">
-            <CheckBox x:Name="DiagnosticCheckBox"
-                      Content="Diagnostic"
-                      Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
-            <ComboBox x:Name="EngineComboBox" Margin="0,12,0,0">
-                <ComboBoxItem Content="Native C Tree-sitter" />
-                <ComboBoxItem Content="Managed Tree-sitter" />
-            </ComboBox>
-        </StackPanel>
+        <CheckBox x:Name="DiagnosticCheckBox"
+                  Content="Diagnostic"
+                  Foreground="{DynamicResource {x:Static shell:VsBrushes.WindowTextKey}}"/>
+        <ComboBox x:Name="EngineComboBox" Grid.Row="1" Margin="0,12,0,0">
+            <ComboBoxItem Content="Native C Tree-sitter" />
+            <ComboBoxItem Content="Managed Tree-sitter" />
+        </ComboBox>
+        <TextBlock Grid.Row="2" Margin="0,18,0,6" Text="Scanner priority (highest first)" />
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <ListBox x:Name="ScannerOrderListBox"
+                     DisplayMemberPath="DisplayName"
+                     SelectionChanged="ScannerOrderListBox_SelectionChanged"
+                     MinHeight="180"/>
+            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Top">
+                <Button x:Name="MoveUpButton" Width="92" Margin="0,0,0,8" Click="MoveUpButton_Click">Move Up</Button>
+                <Button x:Name="MoveDownButton" Width="92" Margin="0,0,0,16" Click="MoveDownButton_Click">Move Down</Button>
+                <Button Width="92" Click="ResetOrderButton_Click">Reset Default</Button>
+            </StackPanel>
+        </Grid>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
             <Button Width="76" Margin="0,0,8,0" IsDefault="True" Click="OkButton_Click">OK</Button>
             <Button Width="76" IsCancel="True">Cancel</Button>
         </StackPanel>

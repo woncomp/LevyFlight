@@ -207,6 +207,11 @@ namespace LevyFlight
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             InitializeComponent();
+            Loaded += UserControl_Loaded;
+            Unloaded += UserControl_Unloaded;
+            PreviewKeyDown += UserControl_PreviewKeyDown;
+            KeyDown += UserControl_KeyDown;
+            KeyUp += UserControl_KeyUp;
             DataContext = this;
         }
 
@@ -246,7 +251,7 @@ namespace LevyFlight
 
             await Task.Yield();
 
-            StartDiscoverFiles();
+            await StartDiscoverFilesAsync();
         }
 
         private void ViewSource_Filter(object sender, FilterEventArgs e)
@@ -259,7 +264,7 @@ namespace LevyFlight
             }
 
             if (currentPreset != null && !currentPreset.IncludeAll &&
-                !currentPreset.IncludedCategories.Contains(jumpItem.Category))
+                !currentPreset.IncludedScanners.Contains(jumpItem.Scanner))
             {
                 e.Accepted = false;
                 return;
@@ -283,7 +288,7 @@ namespace LevyFlight
                 Name = p.Name,
                 ShortcutKey = p.ShortcutKey,
                 ShortcutLetter = p.ShortcutLetter,
-                IncludedCategories = p.IncludedCategories,
+                IncludedScanners = p.IncludedScanners,
                 IsActive = p.Name == "All In One",
             }).ToList();
 
@@ -372,132 +377,24 @@ namespace LevyFlight
             return null;
         }
 
-        private void StartDiscoverFiles()
+        private async Task StartDiscoverFilesAsync()
         {
-            ThreadHelper.ThrowIfNotOnUIThread();
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            var currentFile = CMD.Instance.GetCurrentFile();
-            var knownFiles = new HashSet<string>();
-            if (!string.IsNullOrEmpty(currentFile))
-            {
-                knownFiles.Add(currentFile);
-            }
+            var context = new ScannerContext(CMD.Instance.GetCurrentFile());
+            await AddScannerItemsAsync(ScannerCatalog.RecentEdit, context, false);
+            await AddScannerItemsAsync(ScannerCatalog.HotFile, context, false);
+            await AddScannerItemsAsync(ScannerCatalog.Transition, context, false);
+            await AddScannerItemsAsync(ScannerCatalog.OpenFile, context, false);
+            await AddScannerItemsAsync(ScannerCatalog.RecentFile, context, false);
+            await AddScannerItemsAsync(ScannerCatalog.ActiveDirectoryFile, context, false);
+            await AddScannerItemsAsync(ScannerCatalog.Bookmark, context, false);
+            await AddScannerItemsAsync(ScannerCatalog.FavoriteFile, context, false);
+            RefreshQuickOpenIndices();
 
-            // Add recent edit regions first: this is the highest-priority category
-            int editRank = 0;
-            foreach (var region in RecentEditCollector.Collect())
+            if (!string.IsNullOrEmpty(context.CurrentFile))
             {
-                var editItem = new JumpItem(Category.RecentEdit, region.FilePath);
-                editItem.SetPosition(region.JumpLine, 0);
-                editItem.ExtraScore = (uint)Math.Max(1, 99 - editRank);
-                AllJumpItems.Add(editItem);
-                knownFiles.Add(region.FilePath);
-                editRank++;
-            }
-
-            // Add recent files
-            var recentFiles = TransitionStore.Instance.Recents;
-            var recentEnd = Math.Max(Math.Min(20, recentFiles.Count), recentFiles.Count * 3 / 4);
-            var recentIdx = 0;
-            for (int recentCount = 6; recentCount > 0 && recentIdx < recentEnd; recentIdx++)
-            {
-                string filePath = System.IO.Path.GetFullPath(recentFiles[recentIdx]);
-                if (!knownFiles.Contains(filePath))
-                {
-                    var jumpItem = new JumpItem(Category.HotFile, filePath);
-                    AllJumpItems.Add(jumpItem);
-                    knownFiles.Add(filePath);
-                    recentCount--;
-                }
-            }
-
-            // Add transitions
-            var transitions = TransitionStore.Instance.GetTransitionsForFile(currentFile);
-            int trEnd = Math.Max(Math.Min(20, transitions.Count), transitions.Count * 3 / 4);
-            int trIdx = 0;
-            for (int trCount = 11; trCount > 0 && trIdx < trEnd; trIdx++)
-            {
-                TransitionRecord tr = transitions[trIdx];
-                var filePath = CommonMixin.ToAbsolutePath(tr.Path);
-                if (!knownFiles.Contains(filePath))
-                {
-                    var jumpItem = new JumpItem(Category.Transition, filePath);
-                    AllJumpItems.Add(jumpItem);
-                    knownFiles.Add(filePath);
-                    trCount--;
-                }
-            }
-
-            // Add active files
-            var activeFiles = CMD.Instance.GetActiveFiles();
-            foreach (var filePath in activeFiles)
-            {
-                if (!knownFiles.Contains(filePath))
-                {
-                    var jumpItem = new JumpItem(Category.OpenFile, filePath);
-                    AllJumpItems.Add(jumpItem);
-                    knownFiles.Add(filePath);
-                }
-            }
-
-            // Add more transition files
-            for (; trIdx < trEnd; trIdx++)
-            {
-                TransitionRecord tr = transitions[trIdx];
-                var filePath = CommonMixin.ToAbsolutePath(tr.Path);
-                if (!knownFiles.Contains(filePath))
-                {
-                    var jumpItem = new JumpItem(Category.RecentFile, filePath);
-                    AllJumpItems.Add(jumpItem);
-                    knownFiles.Add(filePath);
-                }
-            }
-
-            // Add more recent files
-            for (; recentIdx < recentEnd; recentIdx++)
-            {
-                string filePath = recentFiles[recentIdx];
-                if (!knownFiles.Contains(filePath))
-                {
-                    var jumpItem = new JumpItem(Category.RecentFile, filePath);
-                    AllJumpItems.Add(jumpItem);
-                    knownFiles.Add(filePath);
-                }
-            }
-
-            // Add files in the folders of active files
-            {
-                var knownFolders = new HashSet<string>();
-                foreach (var activeFile in activeFiles)
-                {
-                    string currentFolder = System.IO.Path.GetDirectoryName(activeFile);
-                    if (!Directory.Exists(currentFolder) || knownFolders.Contains(currentFolder))
-                    {
-                        continue;
-                    }
-                    knownFolders.Add(currentFolder);
-                    foreach (var filePath in Directory.GetFiles(currentFolder))
-                    {
-                        if (!knownFiles.Contains(filePath) && !CommonMixin.IsExcluded(filePath))
-                        {
-                            var jumpItem = new JumpItem(Category.ActiveDirectoryFile, filePath);
-                            AllJumpItems.Add(jumpItem);
-                            knownFiles.Add(filePath);
-                        }
-                    }
-                }
-            }
-
-            // Add bookmarks
-            foreach (var jumpItem in CMD.Instance.Bookmarks)
-            {
-                AllJumpItems.Add(jumpItem);
-            }
-
-            // Kick off tree-sitter C++ parse of the active document
-            if (!string.IsNullOrEmpty(currentFile))
-            {
-                _ = ExtensionErrorHandler.ExecuteAsync(() => AddTreeSitterItemsAsync(currentFile), "Add Tree-sitter quick-open items");
+                _ = ExtensionErrorHandler.ExecuteAsync(() => AddScannerItemsAsync(ScannerCatalog.TreeSitter, context, false, true), "Add Tree-sitter quick-open items");
             }
 
             // Start scanning the entire solution a little later
@@ -508,22 +405,14 @@ namespace LevyFlight
                 ExtensionErrorHandler.Execute(() =>
                 {
                     timer.Stop();
-                    _ = ExtensionErrorHandler.ExecuteAsync(() => StartDiscoverFilesAsync(knownFiles), "Discover solution files");
+                    _ = ExtensionErrorHandler.ExecuteAsync(() => StartProjectScannerItemsAsync(context), "Discover solution files");
                 }, "Start delayed solution discovery");
             };
             timer.Start();
         }
 
-        private async Task AddTreeSitterItemsAsync(string currentFile)
+        private void AddScannerItems(IEnumerable<JumpItem> items)
         {
-            var items = await TreeSitterCodeParser.ParseAndListFunctionsAsync(currentFile);
-            if (items.Count == 0)
-                return;
-
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-            if (!IsVisible)
-                return;
-
             using (ViewSource.DeferRefresh())
             {
                 foreach (var item in items)
@@ -531,46 +420,57 @@ namespace LevyFlight
                     AllJumpItems.Add(item);
                 }
             }
-            RefreshQuickOpenIndices();
         }
 
-        private async Task StartDiscoverFilesAsync(HashSet<string> knownFiles)
+        private async Task AddScannerItemsAsync(Scanner scanner, ScannerContext context, bool batchResults, bool discardIfHidden = false)
         {
+            IEnumerable<JumpItem> items = await scanner.ScanAsync(context);
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            if (discardIfHidden && !IsVisible)
+            {
+                return;
+            }
 
             List<JumpItem> stagingList = new List<JumpItem>();
-            foreach (var (category, filePath) in CMD.Instance.EnumerateSolutionFiles(knownFiles))
+            foreach (JumpItem item in items)
             {
-                var jumpItem = new JumpItem(category, filePath);
-                stagingList.Add(jumpItem);
-                if (stagingList.Count >= 2000)
+                stagingList.Add(item);
+                if (batchResults && stagingList.Count >= 2000)
                 {
-                    using (ViewSource.DeferRefresh())
-                    {
-                        foreach (var item in stagingList)
-                        {
-                            AllJumpItems.Add(item);
-                        }
-                        stagingList.Clear();
-                        DebugString = $"Files:{AllJumpItems.Count}";
-                    }
+                    AddScannerItems(stagingList);
+                    stagingList.Clear();
+                    DebugString = $"Files:{AllJumpItems.Count}";
                     RefreshQuickOpenIndices();
                     await Task.Yield();
                 }
-                if (!this.IsVisible)
+                if (discardIfHidden && !IsVisible)
                 {
                     return;
                 }
             }
-            using (ViewSource.DeferRefresh())
+            if (stagingList.Count > 0)
             {
-                foreach (var item in stagingList)
-                {
-                    AllJumpItems.Add(item);
-                }
+                AddScannerItems(stagingList);
                 DebugString = $"Files:{AllJumpItems.Count}";
             }
             RefreshQuickOpenIndices();
+        }
+
+        private async Task StartProjectScannerItemsAsync(ScannerContext context)
+        {
+            await AddScannerItemsAsync(ScannerCatalog.CurrentProjectFile, context, true, true);
+            if (!IsVisible)
+            {
+                return;
+            }
+
+            await AddScannerItemsAsync(ScannerCatalog.ActiveProjectFile, context, true, true);
+            if (!IsVisible)
+            {
+                return;
+            }
+
+            await AddScannerItemsAsync(ScannerCatalog.SolutionFile, context, true, true);
         }
 
         private JumpItem GetQuickOpenItemForKey(Key key)
@@ -1053,7 +953,16 @@ namespace LevyFlight
                 {
                     Owner = ownerWindow
                 };
-                window.ShowDialog();
+                if (window.ShowDialog() == true)
+                {
+                    foreach (JumpItem jumpItem in AllJumpItems)
+                    {
+                        jumpItem.UpdateScore();
+                    }
+
+                    ViewSource.View.Refresh();
+                    RefreshQuickOpenIndices();
+                }
                 UpdateDiagnosticOverlayVisibility();
             }, "Open Levy Flight settings");
         }

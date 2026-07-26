@@ -239,7 +239,7 @@ namespace LevyFlight
                 bookmarkName = string.Format("{0} (Line:{1})", doc.Name, lineNo);
             }
 
-            var jumpItem = new JumpItem(Category.Bookmark, filePath);
+            var jumpItem = new JumpItem(ScannerCatalog.Bookmark, filePath);
             jumpItem.Name = bookmarkName;
             jumpItem.SetPosition(lineNo, col);
             Bookmarks.Add(jumpItem);
@@ -330,61 +330,7 @@ namespace LevyFlight
             return list.ToArray();
         }
 
-        public IEnumerable<(Category, string)> EnumerateSolutionFiles(HashSet<string> knownFiles)
-        {
-            ThreadHelper.ThrowIfNotOnUIThread();
-            DTE IDE = GetActiveIDE();
-            //Debug.WriteLine("Active Doc: " + IDE.ActiveDocument.FullName + " " + IDE.ActiveDocument.ProjectItem.Name);
-
-            // Current openning files
-            var allProjects = new HashSet<Project>();
-            foreach (Project _proj in IDE.Solution.Projects)
-            {
-                foreach (Project project in ExpandProjectRecursive(_proj))
-                {
-                    allProjects.Add(project);
-                }
-            }
-
-            var currentProject = IDE.ActiveDocument?.ProjectItem?.ContainingProject;
-            var activeProjects = FindActiveProjects(allProjects);
-
-            var sortedProjects = allProjects.Select(p =>
-            {
-                if (p == currentProject)
-                {
-                    return (p, Category.CurrentProjectFile);
-                }
-                else if (activeProjects.Contains(p))
-                {
-                    return (p, Category.ActiveProjectFile);
-                }
-                else
-                {
-                    return (p, Category.SolutionFile);
-                }
-            }).OrderByDescending(x => x.Item2).ToArray();
-
-            // Files in projects of open files
-            foreach (var (project, category) in sortedProjects)
-            {
-                foreach (var item in EnumerateProjectItems(project.ProjectItems))
-                {
-                    if (item.FileNames[0].Contains(project.FullName))
-                    {
-                        continue;
-                    }
-                    var filePath = item.FileNames[0];
-                    if (!knownFiles.Contains(filePath))
-                    {
-                        knownFiles.Add(filePath);
-                        yield return (category, filePath);
-                    }
-                }
-            }
-        }
-
-        private List<Project> FindActiveProjects(HashSet<Project> knownProjects)
+        internal List<Project> FindActiveProjects(HashSet<Project> knownProjects)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
 
@@ -438,7 +384,7 @@ namespace LevyFlight
             return results;
         }
 
-        private static IEnumerable<Project> ExpandProjectRecursive(Project project)
+        internal static IEnumerable<Project> ExpandProjectRecursive(Project project)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             const string SolutionFolder = "{66A26720-8FB5-11D2-AA7E-00C04F688DDE}";
@@ -463,7 +409,7 @@ namespace LevyFlight
         }
 
 
-        private IEnumerable<ProjectItem> EnumerateProjectItems(ProjectItems items)
+        internal IEnumerable<ProjectItem> EnumerateProjectItems(ProjectItems items)
         {
             const string ProjectFileGuid = VSConstants.ItemTypeGuid.PhysicalFile_string;
             const string ProjectFolderGuid = VSConstants.ItemTypeGuid.PhysicalFolder_string;

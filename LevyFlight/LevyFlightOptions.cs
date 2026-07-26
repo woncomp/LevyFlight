@@ -1,6 +1,8 @@
 using Microsoft.VisualStudio.Shell;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 
 namespace LevyFlight
 {
@@ -8,8 +10,17 @@ namespace LevyFlight
     {
         private const string DiagnosticKey = "Diagnostic";
         private const string TreeSitterEngineKey = "TreeSitterEngine";
+        private const string ScannerOrderKey = "ScannerOrder";
         private static bool diagnostic;
         private static TreeSitter.TreeSitterEngine treeSitterEngine = TreeSitter.TreeSitterEngine.Native;
+        private static IReadOnlyList<Scanner> scannerOrder = ScannerCatalog.DefaultPriorityOrder;
+
+        static LevyFlightOptions()
+        {
+            ScannerCatalog.ApplyPriorityOrder(scannerOrder);
+        }
+
+        public static IReadOnlyList<Scanner> ScannerOrder => scannerOrder;
 
         public static TreeSitter.TreeSitterEngine TreeSitterEngine
         {
@@ -47,6 +58,23 @@ namespace LevyFlight
             }
         }
 
+        public static void SetScannerOrder(IEnumerable<Scanner> scanners)
+        {
+            ApplyScannerOrder(ScannerCatalog.NormalizeOrder(scanners));
+            ExtensionErrorHandler.Execute(() =>
+            {
+                ThreadHelper.ThrowIfNotOnUIThread();
+                var settings = LevyFlightWindowCommand.Instance?.SettingsStore;
+                if (settings == null)
+                    return;
+
+                settings.SetString(
+                    LevyFlightWindowCommand.SettingsCollectionName,
+                    ScannerOrderKey,
+                    string.Join(";", scannerOrder.Select(scanner => scanner.Id)));
+            }, "Save scanner order option");
+        }
+
         public static void Load()
         {
             try
@@ -59,11 +87,23 @@ namespace LevyFlight
                 diagnostic = settings.GetBoolean(LevyFlightWindowCommand.SettingsCollectionName, DiagnosticKey, false);
                 treeSitterEngine = (TreeSitter.TreeSitterEngine)settings.GetInt32(
                     LevyFlightWindowCommand.SettingsCollectionName, TreeSitterEngineKey, (int)TreeSitter.TreeSitterEngine.Native);
+
+                string savedOrder = settings.GetString(LevyFlightWindowCommand.SettingsCollectionName, ScannerOrderKey, null);
+                ApplyScannerOrder(ScannerCatalog.NormalizeOrder(
+                    string.IsNullOrWhiteSpace(savedOrder)
+                        ? null
+                        : savedOrder.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)));
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[LevyFlight] Read Diagnostic option failed: " + ex.Message);
+                Debug.WriteLine("[LevyFlight] Read Levy Flight options failed: " + ex.Message);
             }
+        }
+
+        private static void ApplyScannerOrder(IReadOnlyList<Scanner> order)
+        {
+            scannerOrder = order;
+            ScannerCatalog.ApplyPriorityOrder(scannerOrder);
         }
     }
 }

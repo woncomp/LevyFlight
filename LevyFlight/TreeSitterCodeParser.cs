@@ -73,7 +73,7 @@ namespace LevyFlight
     /// </remarks>
     internal static class TreeSitterCodeParser
     {
-        public static async Task<List<JumpItem>> ParseAndListFunctionsAsync(string filePath)
+        public static async Task<List<JumpItem>> ParseAndListFunctionsAsync(string filePath, Scanner scanner)
         {
             return await Task.Run(() =>
             {
@@ -84,7 +84,7 @@ namespace LevyFlight
                     var tree = TreeSitterParser.Parse(sourceText);
                     var root = tree.Root;
                     var scopeStack = new List<string>();
-                    CollectFunctions(root, filePath, scopeStack, results);
+                    CollectFunctions(root, filePath, scopeStack, results, scanner);
 
                     TreeSitterDiagnostics.SaveParse(filePath, sourceText, tree, "QuickOpen", TreeSitterParser.CurrentEngineName);
                 }
@@ -96,7 +96,7 @@ namespace LevyFlight
             });
         }
 
-        private static void CollectFunctions(SyntaxNode node, string filePath, List<string> scopeStack, List<JumpItem> results, bool insideFunction = false, string currentClassName = null)
+        private static void CollectFunctions(SyntaxNode node, string filePath, List<string> scopeStack, List<JumpItem> results, Scanner scanner, bool insideFunction = false, string currentClassName = null)
         {
             string nodeType = node.Type;
 
@@ -150,7 +150,7 @@ namespace LevyFlight
                 string displayName = (!string.IsNullOrEmpty(returnType) ? returnType + " " : "") + funcName + "(" + paramList + ")";
 
                 var start = node.Start;
-                var jumpItem = new JumpItem(Category.TreeSitter, filePath);
+                var jumpItem = new JumpItem(scanner, filePath);
                 jumpItem.Name = displayName;
                 jumpItem.SetPosition((int)start.Row + 1, (int)start.Column);
                 jumpItem.IconMoniker = KnownMonikers.MethodPublic;
@@ -176,7 +176,7 @@ namespace LevyFlight
                     string displayName = (!string.IsNullOrEmpty(returnType) ? returnType + " " : "") + funcName + "(" + paramList + ")";
 
                     var start = node.Start;
-                    var jumpItem = new JumpItem(Category.TreeSitter, filePath);
+                    var jumpItem = new JumpItem(scanner, filePath);
                     jumpItem.Name = displayName;
                     jumpItem.SetPosition((int)start.Row + 1, (int)start.Column);
                     jumpItem.IconMoniker = KnownMonikers.Procedure;
@@ -189,7 +189,7 @@ namespace LevyFlight
             int childCount = node.Children.Count;
             for (int i = 0; i < childCount; i++)
             {
-                CollectFunctions(node.Children[i], filePath, scopeStack, results, insideFunction, currentClassName);
+                CollectFunctions(node.Children[i], filePath, scopeStack, results, scanner, insideFunction, currentClassName);
             }
 
             if (pushedScope)

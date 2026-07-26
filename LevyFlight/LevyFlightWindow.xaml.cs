@@ -103,6 +103,7 @@ namespace LevyFlight
             }
             catch (Exception ex)
             {
+                ExtensionErrorHandler.Log("Initialize Levy Flight window", ex);
                 ErrorMessage = $"Failed to load Levy Flight: {ex.Message}";
                 HasError = true;
                 IsLoading = false;

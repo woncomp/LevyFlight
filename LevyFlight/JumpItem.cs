@@ -24,14 +24,14 @@ namespace LevyFlight
     {
         public string Name { get; set; }
         public string FullPath { get; set; }
-        public Category Category { get; set; }
+        public Scanner Scanner { get; set; }
         public int LineNumber { get; set; }
         public int CaretColumn { get; set; }
 
         public uint Score { get; set; }
         public ScoreComponent[] ScoreComponents { get; private set; }
 
-        /// <summary>Icon shown in the jump list. Set automatically by category; overridden for TreeSitter items.</summary>
+        /// <summary>Icon shown in the jump list. Set automatically by scanner; overridden for TreeSitter items.</summary>
         public ImageMoniker IconMoniker { get; set; }
 
         /// <summary>Index used for quick-open hotkey hints. -1 = no hint, 0 = first item (no hotkey), 1..15 = hotkey 1-9,Q,W,E,R,T,Y.</summary>
@@ -90,40 +90,25 @@ namespace LevyFlight
             // Support both tab (new) and ? (legacy) delimiters
             char delimiter = line.Contains('\t') ? '\t' : '?';
             var tokens = line.Split(delimiter);
-            var jumpItem = new JumpItem(Category.Bookmark, tokens[1]);
+            var jumpItem = new JumpItem(ScannerCatalog.Bookmark, tokens[1]);
             jumpItem.Name = tokens[0];
             jumpItem.SetPosition(int.Parse(tokens[2]), int.Parse(tokens[3]));
             return jumpItem;
         }
 
-        public JumpItem(Category category, string fullPath)
+        public JumpItem(Scanner scanner, string fullPath)
         {
+            if (scanner == null)
+                throw new ArgumentNullException(nameof(scanner));
+
             Name = System.IO.Path.GetFileName(fullPath);
             FullPath = fullPath;
-            Category = category;
+            Scanner = scanner;
             LineNumber = -1;
             CaretColumn = -1;
             Score = 1;
 
-            // Auto-assign icon based on category
-            switch (category)
-            {
-                case Category.Bookmark:
-                    IconMoniker = KnownMonikers.Bookmark;
-                    break;
-                case Category.FavoriteFile:
-                    IconMoniker = KnownMonikers.Favorite;
-                    break;
-                case Category.TreeSitter:
-                    IconMoniker = KnownMonikers.MethodPublic; // overridden at creation time
-                    break;
-                case Category.RecentEdit:
-                    IconMoniker = KnownMonikers.Edit;
-                    break;
-                default:
-                    IconMoniker = GetFileIconMoniker(fullPath);
-                    break;
-            }
+            IconMoniker = scanner.GetIconMoniker(fullPath);
 
             _scWholeWord = new ScoreComponent_WholeWord();
             _scPathKeywordCI = new ScoreComponent_PathKeywordCI();
@@ -132,7 +117,7 @@ namespace LevyFlight
             {
                 (10, new ScoreComponent_NameKeywordCS()), // Match keywords on item name, case sensitive
                 (10, _scPathKeywordCI), // Match keywords on item full path, case insensitive
-                (10, new ScoreComponent_Category()), // Sort on category
+                (10, new ScoreComponent_ScannerPriority()), // Sort on scanner priority
                 (10, _scNameKeywordCI), // Match keywords on item name, case insensitive
                 (10, _scWholeWord), // Whole word match. First check if the filename without extension matches, if true try to match more components in the full path
             };
@@ -178,63 +163,6 @@ namespace LevyFlight
             this.Score = score;
         }
 
-        /// <summary>
-        /// Maps a file extension to the appropriate VS <see cref="ImageMoniker"/>.
-        /// </summary>
-        public static ImageMoniker GetFileIconMoniker(string filePath)
-        {
-            string ext = System.IO.Path.GetExtension(filePath)?.ToLowerInvariant() ?? "";
-            switch (ext)
-            {
-                case ".cpp":
-                case ".cxx":
-                case ".cc":
-                case ".c":
-                    return KnownMonikers.CPPSourceFile;
-                case ".h":
-                case ".hpp":
-                case ".hxx":
-                case ".hh":
-                case ".inl":
-                case ".ipp":
-                case ".tpp":
-                    return KnownMonikers.CPPHeaderFile;
-                case ".cs":
-                    return KnownMonikers.CSFileNode;
-                case ".xaml":
-                    return KnownMonikers.PhoneXAML;
-                case ".py":
-                    return KnownMonikers.PYFileNode;
-                case ".json":
-                    return KnownMonikers.JSONScript;
-                case ".xml":
-                    return KnownMonikers.XMLFile;
-                case ".js":
-                    return KnownMonikers.JSScript;
-                case ".txt":
-                case ".md":
-                case ".log":
-                    return KnownMonikers.TextFile;
-                default:
-                    return KnownMonikers.Document;
-            }
-        }
-    }
-
-    public enum Category
-    {
-        SolutionFile,
-        ActiveProjectFile, // Files in projects of active files
-        CurrentProjectFile, // File in the project of the current file
-        FavoriteFile,
-        Bookmark,
-        ActiveDirectoryFile,
-        TreeSitter,
-        RecentFile,
-        OpenFile,
-        Transition,
-        HotFile,
-        RecentEdit,
     }
 
     public class QuickOpenPreset
@@ -242,8 +170,8 @@ namespace LevyFlight
         public string Name { get; set; }
         public Key ShortcutKey { get; set; }
         public string ShortcutLetter { get; set; }
-        public HashSet<Category> IncludedCategories { get; set; }
-        public bool IncludeAll => IncludedCategories == null || IncludedCategories.Count == 0;
+        public HashSet<Scanner> IncludedScanners { get; set; }
+        public bool IncludeAll => IncludedScanners == null || IncludedScanners.Count == 0;
 
         public static readonly QuickOpenPreset[] DefaultPresets = new[]
         {
@@ -252,17 +180,17 @@ namespace LevyFlight
                 Name = "All In One",
                 ShortcutKey = Key.H,
                 ShortcutLetter = "H",
-                IncludedCategories = null
+                IncludedScanners = null
             },
             new QuickOpenPreset
             {
                 Name = "Files",
                 ShortcutKey = Key.F,
                 ShortcutLetter = "F",
-                IncludedCategories = new HashSet<Category>
+                IncludedScanners = new HashSet<Scanner>
                 {
-                    Category.HotFile, Category.Transition, Category.OpenFile,
-                    Category.RecentFile, Category.ActiveDirectoryFile
+                    ScannerCatalog.HotFile, ScannerCatalog.Transition, ScannerCatalog.OpenFile,
+                    ScannerCatalog.RecentFile, ScannerCatalog.ActiveDirectoryFile
                 }
             },
             new QuickOpenPreset
@@ -270,14 +198,14 @@ namespace LevyFlight
                 Name = "Bookmarks",
                 ShortcutKey = Key.B,
                 ShortcutLetter = "B",
-                IncludedCategories = new HashSet<Category> { Category.Bookmark }
+                IncludedScanners = new HashSet<Scanner> { ScannerCatalog.Bookmark }
             },
             new QuickOpenPreset
             {
                 Name = "Edits",
                 ShortcutKey = Key.M,
                 ShortcutLetter = "M",
-                IncludedCategories = new HashSet<Category> { Category.RecentEdit, Category.RecentFile }
+                IncludedScanners = new HashSet<Scanner> { ScannerCatalog.RecentEdit, ScannerCatalog.RecentFile }
             },
         };
     }
@@ -289,8 +217,8 @@ namespace LevyFlight
         public string Name { get; set; }
         public string ShortcutLetter { get; set; }
         public Key ShortcutKey { get; set; }
-        public HashSet<Category> IncludedCategories { get; set; }
-        public bool IncludeAll => IncludedCategories == null || IncludedCategories.Count == 0;
+        public HashSet<Scanner> IncludedScanners { get; set; }
+        public bool IncludeAll => IncludedScanners == null || IncludedScanners.Count == 0;
 
         private bool isActive;
         public bool IsActive
@@ -500,15 +428,15 @@ namespace LevyFlight
         }
     }
 
-    public class ScoreComponent_Category : ScoreComponent
+    public class ScoreComponent_ScannerPriority : ScoreComponent
     {
-        public override string Name => "Category";
+        public override string Name => "Scanner";
 
         public override void Evaluate(JumpItem jumpItem)
         {
-            this.Score = (uint)jumpItem.Category;
+            this.Score = (uint)jumpItem.Scanner.Priority;
 #if SHOW_DEBUG_INFO
-            this.DebugInfo = jumpItem.Category.ToString();
+            this.DebugInfo = jumpItem.Scanner.DisplayName;
 #endif
         }
     }

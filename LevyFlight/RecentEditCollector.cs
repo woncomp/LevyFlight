@@ -51,24 +51,31 @@ namespace LevyFlight
 
         private static readonly List<TrackedDocument> Tracked = new List<TrackedDocument>();
 
-        private static ITextDifferencingService _differ;
+        private static ITextDifferencingSelectorService _differSelector;
+        private static bool _initialized;
 
         public static void Initialize(IComponentModel componentModel, Package package)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            if (componentModel == null || package == null)
+            if (_initialized || componentModel == null || package == null)
                 return;
 
             var docService = componentModel.GetService<ITextDocumentFactoryService>();
             if (docService == null)
                 return;
 
-            docService.TextDocumentCreated += OnTextDocumentCreated;
-            docService.TextDocumentDisposed += OnTextDocumentDisposed;
-            _differ = componentModel.GetService<ITextDifferencingService>();
+            var adapters = componentModel.GetService<IVsEditorAdaptersFactoryService>();
+            ITextDifferencingSelectorService differSelector = null;
+            try
+            {
+                differSelector = componentModel.GetService<ITextDifferencingSelectorService>();
+            }
+            catch (Exception ex)
+            {
+                ExtensionErrorHandler.Log("Acquire text differencing selector", ex);
+            }
 
             // Catch documents that were opened before this initialization.
-            var adapters = componentModel.GetService<IVsEditorAdaptersFactoryService>();
             var rdt = new RunningDocumentTable(package);
             foreach (var info in rdt)
             {
@@ -84,6 +91,11 @@ namespace LevyFlight
                         Register(buffer, info.Moniker);
                 }, "Register open document for edit tracking");
             }
+
+            _differSelector = differSelector;
+            docService.TextDocumentCreated += OnTextDocumentCreated;
+            docService.TextDocumentDisposed += OnTextDocumentDisposed;
+            _initialized = true;
         }
 
         private static void OnTextDocumentCreated(object sender, TextDocumentEventArgs e)
@@ -204,18 +216,22 @@ namespace LevyFlight
         /// <summary>
         /// Computes the set of 0-based lines whose current content differs from the pinned
         /// baseline, using VS's own text differ. Reverted edits cancel out by construction.
-        /// Empty when the differ service is unavailable (caller falls back to the
+        /// Null when the differ service is unavailable (caller falls back to the
         /// version-chain union).
         /// </summary>
         private static HashSet<int> GetChangedLines(TrackedDocument doc, ITextSnapshot snapshot)
         {
-            var lines = new HashSet<int>();
-            if (_differ == null || ReferenceEquals(doc.Baseline, snapshot))
-                return lines;
+            if (ReferenceEquals(doc.Baseline, snapshot))
+                return new HashSet<int>();
 
-            ExtensionErrorHandler.Execute(() =>
+            var differ = GetDifferencingService(doc.Buffer);
+            if (differ == null)
+                return null;
+
+            var lines = new HashSet<int>();
+            try
             {
-                var diff = _differ.DiffSnapshotSpans(
+                var diff = differ.DiffSnapshotSpans(
                     new SnapshotSpan(doc.Baseline, 0, doc.Baseline.Length),
                     new SnapshotSpan(snapshot, 0, snapshot.Length),
                     default(StringDifferenceOptions));
@@ -234,8 +250,30 @@ namespace LevyFlight
                         lines.Add(line);
                     }
                 }
-            }, "Diff document against baseline");
+            }
+            catch (Exception ex)
+            {
+                ExtensionErrorHandler.Log("Diff document against baseline", ex);
+                return null;
+            }
             return lines;
+        }
+
+        private static ITextDifferencingService GetDifferencingService(ITextBuffer buffer)
+        {
+            if (_differSelector == null || buffer == null)
+                return null;
+
+            try
+            {
+                return _differSelector.GetTextDifferencingService(buffer.ContentType)
+                    ?? _differSelector.DefaultTextDifferencingService;
+            }
+            catch (Exception ex)
+            {
+                ExtensionErrorHandler.Log("Select text differencing service", ex);
+                return null;
+            }
         }
 
         private static List<EditRegion> CollectDocumentRegions(TrackedDocument doc)
@@ -304,7 +342,7 @@ namespace LevyFlight
             // The changed line set comes from the content diff (same semantics as VS's
             // track-changes margin); fall back to the version-chain union without a differ.
             var diffLines = GetChangedLines(doc, snapshot);
-            var touchedLines = (diffLines.Count > 0 ? diffLines : new HashSet<int>(lastOrder.Keys)).ToList();
+            var touchedLines = (diffLines ?? new HashSet<int>(lastOrder.Keys)).ToList();
             touchedLines.Sort();
 
             int i = 0;

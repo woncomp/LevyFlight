@@ -32,6 +32,7 @@ namespace LevyFlight
     /// </remarks>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.SolutionExists_string, PackageAutoLoadFlags.BackgroundLoad)]
+    [ProvideBindingPath]
     [Guid(LevyFlightPackage.PackageGuidString)]
     [ProvideMenuResource("Menus.ctmenu", 2)]
     // Note: LevyFlightWindow is a plain WPF Window shown via ShowDialog(), not a
