@@ -17,7 +17,7 @@ namespace LevyFlight
             if (outputWindow == null)
                 return;
 
-            outputWindow.CreatePane(ref PaneGuid, "LevyFlight", 1, 1);
+            outputWindow.CreatePane(ref PaneGuid, "Levy Flight", 1, 1);
             outputWindow.GetPane(ref PaneGuid, out _pane);
         }
 

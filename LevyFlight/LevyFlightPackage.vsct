@@ -34,8 +34,8 @@
       <Menu guid="guidLevyFlightPackageCmdSet" id="TopLevelMenu" priority="0x700" type="Menu">
         <Parent guid="guidSHLMainMenu" id="IDG_VS_MM_TOOLSADDINS" />
         <Strings>
-          <ButtonText>LevyFlight</ButtonText>
-          <CommandName>LevyFlight</CommandName>
+          <ButtonText>Levy Flight</ButtonText>
+          <CommandName>Levy Flight</CommandName>
         </Strings>
       </Menu>
 
@@ -43,8 +43,8 @@
         <Parent guid="guidSHLMainMenu" id="IDM_VS_TOOL_STANDARD" />
         <CommandFlag>DefaultDocked</CommandFlag>
         <Strings>
-          <ButtonText>LevyFlight</ButtonText>
-          <CommandName>LevyFlight</CommandName>
+          <ButtonText>Levy Flight</ButtonText>
+          <CommandName>Levy Flight</CommandName>
         </Strings>
       </Menu>
     </Menus>
@@ -89,7 +89,7 @@
         <Parent guid="guidLevyFlightPackageCmdSet" id="MyMenuGroup" />
         <Icon guid="guidImages" id="bmpPic2" />
         <Strings>
-          <ButtonText>Toggle LevyFlight Bookmark</ButtonText>
+          <ButtonText>Toggle Levy Flight Bookmark</ButtonText>
         </Strings>
       </Button>
 
