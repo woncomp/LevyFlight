@@ -8,7 +8,11 @@
 
 ## Versioning
 
-- **Version advancing during daily development** Then the user explictly asks a version bump, increase the build(tail) version by 1, e.g. `x.y.z.W` -> `x.y.z.(W+1)` Update both `Properties/AssemblyInfo.cs` (`AssemblyVersion` and `AssemblyFileVersion`) and `source.extension.vsixmanifest` (the `Version` attribute in the `Identity` element). Keep them in sync.
+- **Version advancing during daily development** Then the user explictly asks a version bump, increase the build(tail) version by 1, e.g. `x.y.z.W` -> `x.y.z.(W+1)`
+- **A version number lives in three places — always update all of them together and keep them in sync:**
+  1. `LevyFlight/Properties/AssemblyInfo.cs` — `AssemblyVersion` and `AssemblyFileVersion`
+  2. `LevyFlight/source.extension.vsixmanifest` — the `Version` attribute in the `Identity` element
+  3. `LevyFlight/LevyFlightPackage.cs` — the `Version` property of the `[assembly: ProvideCodeBase(...)]` attribute (must match `AssemblyVersion`, otherwise CI fails with `CreatePkgDef : error : ProvideCodeBaseAttribute: Invalid value specified for Version.`)
 - **When the user requests a release, reset the build (tail) version to 0 and bump the version based on which version component the user requested:**
   - **major**: first component (e.g., `X.y.z.w` -> `(X+1).0.0.0`)
   - **minor**: second component (e.g., `x.Y.z.w` -> `x.(Y+1).0.0`)
