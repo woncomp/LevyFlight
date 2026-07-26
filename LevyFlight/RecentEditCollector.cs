@@ -129,9 +129,11 @@ namespace LevyFlight
             });
         }
 
-        public static List<EditRegion> Collect()
+        public static List<EditRegion> Collect(ScannerDumpSection dump = null)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
+
+            dump?.Detail("Collecting edit regions from " + Tracked.Count + " tracked documents");
 
             var ordered = new List<EditRegion>();
             foreach (var doc in OrderDocuments())
@@ -141,7 +143,8 @@ namespace LevyFlight
                     if (string.IsNullOrEmpty(doc.FilePath) || !File.Exists(doc.FilePath))
                         return;
 
-                    foreach (var region in CollectDocumentRegions(doc))
+                    dump?.Detail("Document: " + doc.FilePath);
+                    foreach (var region in CollectDocumentRegions(doc, dump))
                     {
                         region.FilePath = doc.FilePath;
                         ordered.Add(region);
@@ -176,7 +179,7 @@ namespace LevyFlight
 
             ExtensionErrorHandler.Execute(() =>
             {
-                foreach (var region in CollectDocumentRegions(doc))
+                foreach (var region in CollectDocumentRegions(doc, null))
                 {
                     region.FilePath = doc.FilePath;
                     regions.Add(region);
@@ -276,7 +279,7 @@ namespace LevyFlight
             }
         }
 
-        private static List<EditRegion> CollectDocumentRegions(TrackedDocument doc)
+        private static List<EditRegion> CollectDocumentRegions(TrackedDocument doc, ScannerDumpSection dump)
         {
             var regions = new List<EditRegion>();
             var snapshot = doc.Buffer.CurrentSnapshot;
@@ -325,9 +328,20 @@ namespace LevyFlight
                             endLine = startLine;
                             jumpLine = startLine;
                         }
+
+                        dump?.Detail(string.Format(
+                            "  version {0} change: NewSpan={1}..{2} (length {3}) -> current lines {4}..{5}, jump={6}",
+                            order,
+                            change.NewSpan.Start,
+                            change.NewSpan.End,
+                            change.NewSpan.Length,
+                            startLine,
+                            endLine,
+                            jumpLine));
                     }
                     catch (Exception)
                     {
+                        dump?.Detail("  version " + order + " change: NewSpan=" + change.NewSpan + " -> mapping failed");
                         continue;
                     }
 

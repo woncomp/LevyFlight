@@ -27,7 +27,7 @@ namespace LevyFlight
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             int editRank = 0;
-            foreach (RecentEditCollector.EditRegion region in RecentEditCollector.Collect())
+            foreach (RecentEditCollector.EditRegion region in RecentEditCollector.Collect(dump))
             {
                 dump.Input(region.FilePath + " line " + (region.JumpLine + 1));
                 JumpItem jumpItem = CreateJumpItem(region.FilePath);
