@@ -33,6 +33,7 @@ namespace LevyFlight
         public static void Log(string context, Exception ex)
         {
             Debug.WriteLine("[LevyFlight] " + context + ": " + ex);
+            Logger.Error(context, ex);
         }
 
         public static bool LooksLikeLevyFlight(Exception ex)

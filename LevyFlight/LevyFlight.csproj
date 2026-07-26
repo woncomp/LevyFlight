@@ -51,6 +51,8 @@
     <Compile Include="CodePreviewManager.cs" />
     <Compile Include="CommonMixin.cs" />
     <Compile Include="ExtensionErrorHandler.cs" />
+    <Compile Include="FileDiagnostics.cs" />
+    <Compile Include="Logger.cs" />
     <Compile Include="KeyTipAdorner.cs" />
     <Compile Include="JumpItem.cs" />
     <Compile Include="LevyFlightOptions.cs" />
