@@ -1,7 +1,6 @@
 using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 
 namespace LevyFlight
@@ -96,7 +95,7 @@ namespace LevyFlight
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[LevyFlight] Read Levy Flight options failed: " + ex.Message);
+                Logger.Error("Read Levy Flight options", ex);
             }
         }
 

@@ -2,7 +2,6 @@
 using Microsoft.VisualStudio.Imaging;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -90,7 +89,7 @@ namespace LevyFlight
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine("[TreeSitter] Error parsing document: " + ex.Message);
+                    Logger.Error("Parse document", ex);
                 }
                 return results;
             });
@@ -483,30 +482,6 @@ namespace LevyFlight
             // For identifiers, qualified_identifier, destructor_name, template_function, operator_name etc.
             // just return the source text of the node
             return declarator.Text;
-        }
-
-        public static void PrintTree(SyntaxNode node, int depth)
-        {
-            string indent = new string(' ', depth * 2);
-            string nodeType = node.Type;
-
-            // For small nodes, show the text content
-            string content = "";
-            if (node.Text.Length < 40)
-            {
-                content = node.Text.Replace("\n", "\\n").Replace("\r", "");
-                if (content.Length > 40) content = content.Substring(0, 37) + "...";
-                content = $" \"{content}\"";
-            }
-
-            var start = node.Start;
-            Debug.WriteLine($"{indent}{nodeType}  (line {start.Row + 1}){content}");
-
-            int childCount = node.Children.Count;
-            for (int i = 0; i < childCount; i++)
-            {
-                PrintTree(node.Children[i], depth + 1);
-            }
         }
     }
 }

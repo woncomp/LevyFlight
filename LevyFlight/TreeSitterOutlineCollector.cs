@@ -1,7 +1,6 @@
 ﻿using LevyFlight.TreeSitter;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -30,7 +29,7 @@ namespace LevyFlight
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine("[OutlineCollector] Error: " + ex.Message);
+                    Logger.Error("Collect outline symbols", ex);
                 }
                 return results;
             });
@@ -48,7 +47,7 @@ namespace LevyFlight
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[OutlineCollector] Error: " + ex.Message);
+                Logger.Error("Collect outline symbols", ex);
             }
             return results;
         }

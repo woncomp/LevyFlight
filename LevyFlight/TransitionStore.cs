@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
-using System.Diagnostics;
 using System.Linq;
 using System.IO;
 
@@ -127,7 +126,7 @@ namespace LevyFlight
                 var oldDocPath = _lastActiveDocument;
                 if(!string.IsNullOrEmpty(oldDocPath))
                 {
-                    Debug.WriteLine("Transition: {0} => {1}", oldDocPath, newDocPath);
+                    Logger.Log(string.Format("Transition: {0} => {1}", oldDocPath, newDocPath));
 
                     // Recent files
                     Recents.RemoveAll(x => x == newDocFullPath);

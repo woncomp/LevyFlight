@@ -7,7 +7,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -510,7 +509,6 @@ namespace LevyFlight
 
                 while (IDE.ActiveDocument.FullName != jumpItem.FullPath)
                 {
-                    Debug.WriteLine("GoToAsync Wait: " + IDE.ActiveDocument.FullName);
                     await Task.Yield();
                 }
 
@@ -520,7 +518,6 @@ namespace LevyFlight
                     if (textView != null)
                     {
                         textView.GetTextStream(0, 0, 13, 0, out string text);
-                        Debug.WriteLine("GoToAsync: " + text);
                         textView.SetCaretPos(jumpItem.LineNumber, jumpItem.CaretColumn);
                         textView.CenterLines(jumpItem.LineNumber, 0);
                     }

@@ -10,7 +10,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -167,7 +166,7 @@ namespace LevyFlight
             DTE IDE = Package.GetGlobalService(typeof(DTE)) as DTE;
             if (IDE?.Solution == null || string.IsNullOrEmpty(IDE.Solution.FullName))
             {
-                Debug.WriteLine("[LevyFlight] No loaded solution; command initialization skipped.");
+                Logger.Log("No loaded solution; command initialization skipped.");
                 return;
             }
 
@@ -357,7 +356,6 @@ namespace LevyFlight
                 {
                     var projectIdentifier = projectDir + "\\" + projectName;
                     projectIdentifiers.Add(projectIdentifier);
-                    //Debug.WriteLine($"RunningDocumentTable {info.Moniker} Proj:{projectIdentifier}");
                 }
             }
 
@@ -373,11 +371,9 @@ namespace LevyFlight
                     {
                         continue;
                     }
-                    //Debug.WriteLine($"Check Project: {Path.GetDirectoryName(fullname)} {project.Name} # {dir} {name}");
                     if (Path.GetDirectoryName(fullname) == dir && project.Name == name)
                     {
                         results.Add(project);
-                        //Debug.WriteLine($"Found Project: {project.FullName} {project.Name}");
                     }
                 }
             }
@@ -442,10 +438,6 @@ namespace LevyFlight
                     {
                         yield return item2;
                     }
-                }
-                else
-                {
-                    //Debug.WriteLine(string.Format("  Item:{0} {1}", item.Name, item.Kind));
                 }
             }
         }
@@ -670,7 +662,7 @@ namespace LevyFlight
 
                     if (window?.Frame == null)
                     {
-                        Debug.WriteLine("[BirdsEye] Cannot create Bird's Eye View tool window");
+                        Logger.Error("Cannot create Bird's Eye View tool window");
                     }
                 }, "Show Bird's Eye View");
             });

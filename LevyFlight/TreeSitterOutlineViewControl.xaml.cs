@@ -11,7 +11,6 @@ using Microsoft.VisualStudio.TextManager.Interop;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -112,7 +111,7 @@ namespace LevyFlight
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[BirdsEye] OnLoaded error: " + ex.Message);
+                Logger.Error("BirdsEye OnLoaded", ex);
             }
         }
 
@@ -137,7 +136,7 @@ namespace LevyFlight
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[BirdsEye] OnUnloaded error: " + ex.Message);
+                Logger.Error("BirdsEye OnUnloaded", ex);
             }
         }
 
@@ -165,7 +164,7 @@ namespace LevyFlight
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[BirdsEye] OnBeforeDocumentWindowShow error: " + ex.Message);
+                Logger.Error("BirdsEye OnBeforeDocumentWindowShow", ex);
             }
             return VSConstants.S_OK;
         }
@@ -188,7 +187,7 @@ namespace LevyFlight
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[BirdsEye] OnAfterSave error: " + ex.Message);
+                Logger.Error("BirdsEye OnAfterSave", ex);
             }
             return VSConstants.S_OK;
         }
@@ -216,7 +215,7 @@ namespace LevyFlight
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[BirdsEye] RefreshForActiveDocument error: " + ex.Message);
+                Logger.Error("BirdsEye RefreshForActiveDocument", ex);
             }
         }
 
@@ -299,7 +298,7 @@ namespace LevyFlight
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[BirdsEye] SubscribeToBuffer error: " + ex.Message);
+                Logger.Error("BirdsEye SubscribeToBuffer", ex);
             }
         }
 
@@ -340,7 +339,7 @@ namespace LevyFlight
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[BirdsEye] StartWatchingCurrentFile error: " + ex.Message);
+                Logger.Error("BirdsEye StartWatchingCurrentFile", ex);
             }
         }
 
@@ -421,7 +420,7 @@ namespace LevyFlight
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[BirdsEye] FullParseAsync error: " + ex.Message);
+                Logger.Error("BirdsEye FullParseAsync", ex);
             }
         }
 
@@ -645,7 +644,7 @@ namespace LevyFlight
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[BirdsEye] SyncSelectionToCaret error: " + ex.Message);
+                Logger.Error("BirdsEye SyncSelectionToCaret", ex);
             }
         }
 
@@ -786,7 +785,7 @@ namespace LevyFlight
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[BirdsEye] NavigateToSymbol error: " + ex.Message);
+                Logger.Error("BirdsEye NavigateToSymbol", ex);
             }
             finally
             {
