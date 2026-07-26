@@ -71,7 +71,8 @@
           If you do not want an image next to your command, remove the Icon node /> -->
       <Button guid="guidLevyFlightPackageCmdSet" id="LevyFlightWindowCommandId" priority="0x0100" type="Button">
         <Parent guid="guidLevyFlightPackageCmdSet" id="MyMenuGroup" />
-        <Icon guid="guidImages" id="bmpPic1" />
+        <Icon guid="guidLevyFlightImages" id="LevyFlightWindowIcon" />
+        <CommandFlag>IconIsMoniker</CommandFlag>
         <Strings>
           <ButtonText>Levy Flight Window</ButtonText>
         </Strings>
@@ -196,6 +197,9 @@
       <IDSymbol name="bmpPicX" value="4" />
       <IDSymbol name="bmpPicArrows" value="5" />
       <IDSymbol name="bmpPicStrikethrough" value="6" />
+    </GuidSymbol>
+    <GuidSymbol name="guidLevyFlightImages" value="{A5466D43-BE78-4CD7-A014-68B8C18B4127}">
+      <IDSymbol name="LevyFlightWindowIcon" value="1" />
     </GuidSymbol>
     <GuidSymbol name="guidVSStdEditorText" value="{8B382828-6202-11d1-8870-0000F87579D2}" />
   </Symbols>

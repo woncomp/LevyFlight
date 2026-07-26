@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ImageManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+               xmlns="http://schemas.microsoft.com/VisualStudio/ImageManifestSchema/2014">
+  <Symbols>
+    <Guid Name="LevyFlightImagesGuid" Value="{A5466D43-BE78-4CD7-A014-68B8C18B4127}" />
+    <ID Name="LevyFlightWindowIcon" Value="1" />
+    <String Name="Resources" Value="/LevyFlight;Component/Resources" />
+  </Symbols>
+  <Images>
+    <Image Guid="$(LevyFlightImagesGuid)" ID="$(LevyFlightWindowIcon)">
+      <Source Uri="$(Resources)/LevyFlightWindowCommandIcon.16.16.png">
+        <Size Value="16" />
+      </Source>
+      <Source Uri="$(Resources)/LevyFlightWindowCommandIcon.xaml" />
+    </Image>
+  </Images>
+  <ImageLists />
+</ImageManifest>

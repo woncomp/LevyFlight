@@ -92,6 +92,7 @@
     <None Include="source.extension.vsixmanifest">
       <SubType>Designer</SubType>
     </None>
+    <None Include="Resources\LevyFlightWindowCommandIcon.svg" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
@@ -120,8 +121,16 @@
       <ResourceName>Menus.ctmenu</ResourceName>
     </VSCTCompile>
     <Content Include="Resources\LevyFlightWindowCommand.png" />
+    <Content Include="CustomMonikers.imagemanifest">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Resource Include="Resources\LevyFlightWindowCommandIcon.16.16.png" />
   </ItemGroup>
   <ItemGroup>
+    <Page Include="Resources\LevyFlightWindowCommandIcon.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="LevyFlightQuickOpenControl.xaml">
       <SubType>Designer</SubType>
       <Generator>XamlIntelliSenseFileGenerator</Generator>
@@ -148,6 +157,16 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+  <Target Name="RegisterCustomMonikers" AfterTargets="GeneratePkgDef">
+    <WriteLinesToFile File="$(IntermediateOutputPath)$(TargetName).pkgdef"
+                      Lines="[$RootKey$\ImageLibrary\Monikers\{A5466D43-BE78-4CD7-A014-68B8C18B4127}]"
+                      Encoding="Unicode"
+                      Overwrite="false" />
+    <WriteLinesToFile File="$(IntermediateOutputPath)$(TargetName).pkgdef"
+                      Lines="&quot;Manifest&quot;=&quot;$PackageFolder$\CustomMonikers.imagemanifest&quot;"
+                      Encoding="Unicode"
+                      Overwrite="false" />
+  </Target>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

@@ -6,6 +6,11 @@ using System.Threading;
 using System.Windows.Threading;
 using Task = System.Threading.Tasks.Task;
 
+[assembly: ProvideCodeBase(
+    AssemblyName = "LevyFlight",
+    Version = "0.1.1.0",
+    CodeBase = "$PackageFolder$\\LevyFlight.dll")]
+
 namespace LevyFlight
 {
     /// <summary>
@@ -28,7 +33,7 @@ namespace LevyFlight
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.SolutionExists_string, PackageAutoLoadFlags.BackgroundLoad)]
     [Guid(LevyFlightPackage.PackageGuidString)]
-    [ProvideMenuResource("Menus.ctmenu", 1)]
+    [ProvideMenuResource("Menus.ctmenu", 2)]
     // Note: LevyFlightWindow is a plain WPF Window shown via ShowDialog(), not a
     // ToolWindowPane, so it must NOT be registered with [ProvideToolWindow].
     [ProvideToolWindow(typeof(TreeSitterOutlineView), Style = VsDockStyle.Tabbed, Window = "3ae79031-e1bc-11d0-8f78-00a0c9110057")]
