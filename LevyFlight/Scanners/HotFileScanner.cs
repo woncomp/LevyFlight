@@ -10,19 +10,22 @@ namespace LevyFlight
         public override string Id => "HotFile";
         public override string DisplayName => "Hot File";
 
-        internal override Task<IEnumerable<JumpItem>> ScanAsync(ScannerContext context)
+        internal override Task<IEnumerable<JumpItem>> ScanAsync(ScannerContext context, ScannerDumpSection dump)
         {
-            return Task.FromResult(EnumerateItems(context));
+            return Task.FromResult(EnumerateItems(context, dump));
         }
 
-        private IEnumerable<JumpItem> EnumerateItems(ScannerContext context)
+        private IEnumerable<JumpItem> EnumerateItems(ScannerContext context, ScannerDumpSection dump)
         {
+            dump.Detail("quota: 6 files, recent range [index " + context.RecentIndex + ", " + context.RecentEnd + ")");
             for (int recentCount = 6; recentCount > 0 && context.RecentIndex < context.RecentEnd; context.RecentIndex++)
             {
                 string filePath = Path.GetFullPath(context.RecentFiles[context.RecentIndex]);
-                JumpItem jumpItem = context.CreateClaimedFileItem(this, filePath);
+                dump.Input(filePath + "  [recent #" + context.RecentIndex + "]");
+                JumpItem jumpItem = context.CreateClaimedFileItem(this, filePath, dump);
                 if (jumpItem != null)
                 {
+                    dump.Produced(filePath);
                     yield return jumpItem;
                     recentCount--;
                 }

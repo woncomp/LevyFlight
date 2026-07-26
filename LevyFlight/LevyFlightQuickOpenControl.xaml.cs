@@ -381,6 +381,12 @@ namespace LevyFlight
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
             var context = new ScannerContext(CMD.Instance.GetCurrentFile());
+            ScannerDump scannerDump = LevyFlightOptions.DumpScanners ? ScannerDump.StartNew(context) : null;
+            if (scannerDump != null)
+            {
+                context.EnableClaimTracking();
+                context.DumpSession = scannerDump;
+            }
             await AddScannerItemsAsync(ScannerCatalog.RecentEdit, context, false);
             await AddScannerItemsAsync(ScannerCatalog.HotFile, context, false);
             await AddScannerItemsAsync(ScannerCatalog.Transition, context, false);
@@ -423,36 +429,44 @@ namespace LevyFlight
 
         private async Task AddScannerItemsAsync(Scanner scanner, ScannerContext context, bool batchResults, bool discardIfHidden = false)
         {
-            IEnumerable<JumpItem> items = await scanner.ScanAsync(context);
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-            if (discardIfHidden && !IsVisible)
+            ScannerDumpSection dump = context.DumpSession?.BeginScanner(scanner) ?? ScannerDumpSection.Null;
+            try
             {
-                return;
-            }
-
-            List<JumpItem> stagingList = new List<JumpItem>();
-            foreach (JumpItem item in items)
-            {
-                stagingList.Add(item);
-                if (batchResults && stagingList.Count >= 2000)
-                {
-                    AddScannerItems(stagingList);
-                    stagingList.Clear();
-                    DebugString = $"Files:{AllJumpItems.Count}";
-                    RefreshQuickOpenIndices();
-                    await Task.Yield();
-                }
+                IEnumerable<JumpItem> items = await scanner.ScanAsync(context, dump);
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
                 if (discardIfHidden && !IsVisible)
                 {
                     return;
                 }
+
+                List<JumpItem> stagingList = new List<JumpItem>();
+                foreach (JumpItem item in items)
+                {
+                    stagingList.Add(item);
+                    if (batchResults && stagingList.Count >= 2000)
+                    {
+                        AddScannerItems(stagingList);
+                        stagingList.Clear();
+                        DebugString = $"Files:{AllJumpItems.Count}";
+                        RefreshQuickOpenIndices();
+                        await Task.Yield();
+                    }
+                    if (discardIfHidden && !IsVisible)
+                    {
+                        return;
+                    }
+                }
+                if (stagingList.Count > 0)
+                {
+                    AddScannerItems(stagingList);
+                    DebugString = $"Files:{AllJumpItems.Count}";
+                }
+                RefreshQuickOpenIndices();
             }
-            if (stagingList.Count > 0)
+            finally
             {
-                AddScannerItems(stagingList);
-                DebugString = $"Files:{AllJumpItems.Count}";
+                dump.Complete();
             }
-            RefreshQuickOpenIndices();
         }
 
         private async Task StartProjectScannerItemsAsync(ScannerContext context)

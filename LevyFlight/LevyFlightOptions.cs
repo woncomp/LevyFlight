@@ -8,9 +8,11 @@ namespace LevyFlight
     internal static class LevyFlightOptions
     {
         private const string DiagnosticKey = "Diagnostic";
+        private const string DumpScannersKey = "DumpScanners";
         private const string TreeSitterEngineKey = "TreeSitterEngine";
         private const string ScannerOrderKey = "ScannerOrder";
         private static bool diagnostic;
+        private static bool dumpScanners;
         private static TreeSitter.TreeSitterEngine treeSitterEngine = TreeSitter.TreeSitterEngine.Native;
         private static IReadOnlyList<Scanner> scannerOrder = ScannerCatalog.DefaultPriorityOrder;
 
@@ -57,6 +59,24 @@ namespace LevyFlight
             }
         }
 
+        public static bool DumpScanners
+        {
+            get { return dumpScanners; }
+            set
+            {
+                dumpScanners = value;
+                ExtensionErrorHandler.Execute(() =>
+                {
+                    ThreadHelper.ThrowIfNotOnUIThread();
+                    var settings = LevyFlightWindowCommand.Instance?.SettingsStore;
+                    if (settings == null)
+                        return;
+
+                    settings.SetBoolean(LevyFlightWindowCommand.SettingsCollectionName, DumpScannersKey, value);
+                }, "Save DumpScanners option");
+            }
+        }
+
         public static void SetScannerOrder(IEnumerable<Scanner> scanners)
         {
             ApplyScannerOrder(ScannerCatalog.NormalizeOrder(scanners));
@@ -84,6 +104,7 @@ namespace LevyFlight
                     return;
 
                 diagnostic = settings.GetBoolean(LevyFlightWindowCommand.SettingsCollectionName, DiagnosticKey, false);
+                dumpScanners = settings.GetBoolean(LevyFlightWindowCommand.SettingsCollectionName, DumpScannersKey, false);
                 treeSitterEngine = (TreeSitter.TreeSitterEngine)settings.GetInt32(
                     LevyFlightWindowCommand.SettingsCollectionName, TreeSitterEngineKey, (int)TreeSitter.TreeSitterEngine.Native);
 

@@ -22,6 +22,7 @@ namespace LevyFlight
         private List<Project> allProjects;
         private Project currentProject;
         private HashSet<Project> activeProjects;
+        private Dictionary<string, string> claimOwners;
 
         public ScannerContext(string currentFile)
         {
@@ -41,6 +42,8 @@ namespace LevyFlight
 
         public string CurrentFile { get; }
 
+        internal ScannerDump DumpSession { get; set; }
+
         public HashSet<string> KnownFiles { get; }
 
         public string[] ActiveFiles { get; }
@@ -57,7 +60,12 @@ namespace LevyFlight
 
         public int TransitionEnd { get; }
 
-        public bool TryClaimFile(string filePath)
+        internal void EnableClaimTracking()
+        {
+            claimOwners = new Dictionary<string, string>();
+        }
+
+        internal bool TryClaimFile(string filePath, string owner)
         {
             if (string.IsNullOrEmpty(filePath) || KnownFiles.Contains(filePath))
             {
@@ -65,44 +73,85 @@ namespace LevyFlight
             }
 
             KnownFiles.Add(filePath);
+            if (owner != null && claimOwners != null)
+            {
+                claimOwners[filePath] = owner;
+            }
             return true;
         }
 
-        public void ClaimFile(string filePath)
+        internal string DescribeClaimFailure(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+            {
+                return "empty path";
+            }
+
+            string owner;
+            if (claimOwners != null && claimOwners.TryGetValue(filePath, out owner))
+            {
+                return "already claimed by " + owner;
+            }
+
+            if (string.Equals(filePath, CurrentFile, StringComparison.OrdinalIgnoreCase))
+            {
+                return "current file";
+            }
+
+            return "already known";
+        }
+
+        internal void ClaimFile(string filePath, string owner)
         {
             if (!string.IsNullOrEmpty(filePath))
             {
                 KnownFiles.Add(filePath);
+                if (owner != null && claimOwners != null)
+                {
+                    claimOwners[filePath] = owner;
+                }
             }
         }
 
-        public JumpItem CreateClaimedFileItem(Scanner scanner, string filePath)
+        internal JumpItem CreateClaimedFileItem(Scanner scanner, string filePath, ScannerDumpSection dump)
         {
-            return TryClaimFile(filePath) ? scanner.CreateJumpItem(filePath) : null;
+            if (TryClaimFile(filePath, scanner.Id))
+            {
+                return scanner.CreateJumpItem(filePath);
+            }
+
+            dump.Discarded(filePath, DescribeClaimFailure(filePath));
+            return null;
         }
 
-        public IEnumerable<JumpItem> EnumerateProjectFileItems(Scanner scanner, ProjectScannerScope scope)
+        internal IEnumerable<JumpItem> EnumerateProjectFileItems(Scanner scanner, ProjectScannerScope scope, ScannerDumpSection dump)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             EnsureProjects();
+            dump.Detail("scope: " + scope + ", projects in solution: " + allProjects.Count);
 
             foreach (Project project in allProjects)
             {
                 if (!MatchesScope(project, scope))
                 {
+                    dump.Detail("skip project " + project.Name + ": out of scope");
                     continue;
                 }
 
                 foreach (ProjectItem item in LevyFlightWindowCommand.Instance.EnumerateProjectItems(project.ProjectItems))
                 {
-                    if (item.FileNames[0].Contains(project.FullName))
+                    string filePath = item.FileNames[0];
+                    if (filePath.Contains(project.FullName))
                     {
+                        dump.Discarded(filePath, "project file itself");
                         continue;
                     }
 
-                    JumpItem jumpItem = CreateClaimedFileItem(scanner, item.FileNames[0]);
+                    dump.Input(filePath);
+                    JumpItem jumpItem = CreateClaimedFileItem(scanner, filePath, dump);
                     if (jumpItem != null)
                     {
+                        dump.Produced(filePath);
                         yield return jumpItem;
                     }
                 }

@@ -14,6 +14,7 @@ namespace LevyFlight
         {
             InitializeComponent();
             DiagnosticCheckBox.IsChecked = LevyFlightOptions.Diagnostic;
+            DumpScannersCheckBox.IsChecked = LevyFlightOptions.DumpScanners;
             EngineComboBox.SelectedIndex = LevyFlightOptions.TreeSitterEngine == TreeSitter.TreeSitterEngine.Managed ? 1 : 0;
             scannerOrder = new ObservableCollection<Scanner>(LevyFlightOptions.ScannerOrder);
             ScannerOrderListBox.ItemsSource = scannerOrder;
@@ -27,6 +28,7 @@ namespace LevyFlight
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
                 LevyFlightOptions.Diagnostic = DiagnosticCheckBox.IsChecked == true;
+                LevyFlightOptions.DumpScanners = DumpScannersCheckBox.IsChecked == true;
                 LevyFlightOptions.TreeSitterEngine = EngineComboBox.SelectedIndex == 1
                     ? TreeSitter.TreeSitterEngine.Managed
                     : TreeSitter.TreeSitterEngine.Native;

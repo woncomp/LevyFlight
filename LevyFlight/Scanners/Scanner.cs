@@ -25,7 +25,7 @@ namespace LevyFlight
             return GetFileIconMoniker(filePath);
         }
 
-        internal virtual Task<IEnumerable<JumpItem>> ScanAsync(ScannerContext context)
+        internal virtual Task<IEnumerable<JumpItem>> ScanAsync(ScannerContext context, ScannerDumpSection dump)
         {
             return Task.FromResult<IEnumerable<JumpItem>>(Array.Empty<JumpItem>());
         }

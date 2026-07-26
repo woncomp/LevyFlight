@@ -8,10 +8,10 @@ namespace LevyFlight
     {
         protected abstract ProjectScannerScope Scope { get; }
 
-        internal override async Task<IEnumerable<JumpItem>> ScanAsync(ScannerContext context)
+        internal override async Task<IEnumerable<JumpItem>> ScanAsync(ScannerContext context, ScannerDumpSection dump)
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-            return context.EnumerateProjectFileItems(this, Scope);
+            return context.EnumerateProjectFileItems(this, Scope, dump);
         }
     }
 

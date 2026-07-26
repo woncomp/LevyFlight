@@ -15,9 +15,16 @@ namespace LevyFlight
             return KnownMonikers.Bookmark;
         }
 
-        internal override Task<IEnumerable<JumpItem>> ScanAsync(ScannerContext context)
+        internal override Task<IEnumerable<JumpItem>> ScanAsync(ScannerContext context, ScannerDumpSection dump)
         {
-            return Task.FromResult<IEnumerable<JumpItem>>(LevyFlightWindowCommand.Instance.Bookmarks);
+            IEnumerable<JumpItem> bookmarks = LevyFlightWindowCommand.Instance.Bookmarks;
+            foreach (JumpItem bookmark in bookmarks)
+            {
+                dump.Input(bookmark.FullPath + " line " + (bookmark.LineNumber + 1));
+                dump.Produced(bookmark.FullPath, "line " + (bookmark.LineNumber + 1));
+            }
+
+            return Task.FromResult(bookmarks);
         }
     }
 }

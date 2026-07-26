@@ -80,6 +80,7 @@
     <Compile Include="Scanners\Scanner.cs" />
     <Compile Include="Scanners\ScannerCatalog.cs" />
     <Compile Include="Scanners\ScannerContext.cs" />
+    <Compile Include="Scanners\ScannerDump.cs" />
     <Compile Include="Scanners\TransitionScanner.cs" />
     <Compile Include="Scanners\TreeSitterScanner.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
